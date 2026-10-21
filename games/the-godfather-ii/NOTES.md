@@ -1042,3 +1042,56 @@ A sample can come from either of these, both of which need the owner:
 
 Everything else is in place: the detection path, the behaviour counter in the
 log, and a test loop that needs no game UI.
+### BREAKTHROUGH: the GF2ASI source is an open, documented engine SDK (2026-10-22)
+
+The owner supplied <https://github.com/Omerta-Labs/GF2ASI> - the SE's own source
+tree (1044 files, no license published, so it is used as a **reference** for
+facts and addresses only, no code copied). It answers every question this
+project has been chasing:
+
+**Where a character's transform really lives**
+
+    class Sentient {                       // base of both Player and NPC
+        ...
+        EARS::Havok::CharacterProxy m_CharacterProxy;   // at 0x3C0
+    };
+
+That is the `ADD ECX,0x3C0` from the position getter we disassembled in the very
+first session: the "position" is the Havok character proxy. `SimNPC` keeps a
+mirror in its first member `RwV3d m_CurrentPosition`.
+
+**The engine's own move/teleport functions**
+
+    Player::Teleport(matrix, options, event, partitions) -> engine 0x0079E3C0
+    Player::GetLocalPlayer()  -> PlayerManager::GetPlayer(0) - 0x7CC
+    Player::GetUpgradeComponent() -> engine 0x043B870  (already in our SE API map)
+
+**The .sgp format, verbatim from ModLoaderInit.cpp**
+
+A `.sgp` is a raw `SimGroupTOC` memory image:
+
+    struct SimGroupTOC {
+        uint32_t m_MagicNumber, m_VersionOrDispatchTime;
+        guid32_t m_Guid; uint32_t m_Flags;
+        uint32_t m_NumEnts, m_NumEntsDispatched, m_SharedDataSize, m_DictionarySize;
+        RWS::CAttributePacket** m_EntPackets;   // recovered/relocated by the loader
+        uint32_t m_hStream;
+    };
+
+The loader copies the file into a buffer, `RecoverPtr`s the packet pointers
+against that buffer, walks `m_NumEnts` packets, logs each as
+`Loaded behaviour [0x%X-0x%X-0x%X-0x%X]` (the packet's 128-bit instance id) and
+registers it in a packet map. `SimGroupOverride { guid32_t m_SimGroupGUID;
+uint32_t m_OverrideFlags; }` with flags FORCE_ENABLE=1, FORCE_DISABLE=2,
+IGNORE_DISPATCH_LOCK=4.
+
+**Also documented in the SDK** (usable immediately): the full `Player` layout
+(0x31D0), `PlayerFlag::TELEPORTING`, `Sentient` layout (0x1F30) with
+`m_SentientStateFlags` at 0x1B94 and `m_Vehicle` at 0x1E40, `NPC` (8576 bytes)
+with `GetOwningSimNPC()`, `SimNPC` with `SetIsCrewMember`/`GetIsCrewMember`,
+Havok `CharacterProxy` with `SetCollisionState`/`EnableGravity`, the NPC state
+machines (`seektopositionsm`, `npcfollowsm`, `crewcommandsm`, ...), and the
+stream name hash (`h*65599 + lowercase(c)`).
+
+This is the co-op foundation: move a character with the engine's own Teleport
+(0x0079E3C0) or drive an NPC's seek/follow state machine, no memory poking.

@@ -860,3 +860,33 @@ Next: parse the SimGroup chunk record-by-record (name table first, then the
 object blocks), identify which 8-byte values are GUIDs vs hashes, and locate the
 attribute block that holds a transform. Everything is plain byte work on the
 test copy - no toolkit, no GUI, no synthetic input.
+### Record table mapped across three streams (2026-10-21/22)
+
+New tool `local/strnames.c` -> `strnames.exe` scans a `.str` for the 24-byte
+record pattern (8-byte id + 16-byte NUL-padded ASCII name) and prints them.
+
+Results on the three mission streams:
+
+| file | table starts | records found |
+|---|---|---|
+| cuba.str | 0x64 | **754** |
+| queens.str | 0x64 | (same layout, names `REISDORF`, `BRINKER2`, `CALHOUN1`) |
+| miami.str | 0x64 | (names `AGAY2028`, `CALHOUN1`, `ILIEV184`) |
+
+Facts that now hold:
+
+- The container header is a fixed size: the SDAT chunk starts at 0x3C, its
+  fields begin at 0x44 with `07 00 00 00` (7 resources - exactly the count the
+  toolkit listed) and `20 00 00 00` (header size), and the record table begins
+  at **0x64 in all three files**.
+- Records are `[8-byte id][16-byte name]`, stride 24 bytes, and the id's first
+  dword shares a high byte pattern (`...C832`-`...C939`) while the second dword
+  varies freely - so the id is likely a GUID fragment, not a hash of the name.
+- cuba.str's table holds 754 entries, including script-ish names
+  (`jt_kt_accepted_c`, `dj_kt_complete_c`), i.e. the table is the stream's whole
+  name registry, not only the SimGroup's objects.
+- Names are plain ASCII; only class/attribute names are hashed.
+
+Next: walk past the name registry to the object blocks (class id + attribute
+values) - that is where a transform lives - and confirm the block layout on two
+files at once so a wrong guess is visible immediately.

@@ -1351,3 +1351,17 @@ copy) was stopped and its `scripts\coopcore.asi` is v18.
 * polish - give the puppet the remote player's model (PartedModelMgr /
   TrySwapModel), and drive movement through the seek state machine so the
   animation and pathing come from the game.
+
+### Layer 3 research pointer (next session start)
+
+The SDK's module tree gives the actor/NPC plumbing for layer 3:
+
+    modules/npcscheduling/demographicregion.h/.cpp
+    modules/npcscheduling/demographicregionmanager.h/.cpp   <- region/NPC registry
+    modules/npcscheduling/simnpc.h                          <- per-NPC meta + m_CurrentPosition
+    modules/npc/npc.h, npc.cpp                              <- NPC entity + state machines
+    modules/npc/statemachines/...                           <- movement/behaviour SMs
+
+Start there for a cheap way to enumerate the actors near the player (instead of
+scanning the heap), then mirror the host's list on the client by moving its
+nearest spare Sentients (a rough actor mirror) or by spawning proper NPCs.

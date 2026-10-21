@@ -920,3 +920,39 @@ Next steps:
    same class - e.g. several CALHOUN1 entries in queens.str - and see which
    group differs per instance while the rest is constant);
 3. change one value, write the file, boot the game and look at the result.
+### RESULT: object blocks in the stream are editable and the game loads them (2026-10-22)
+
+First working write primitive of the whole project, and it needs no running
+process at all:
+
+1. `local/strfindblocks.exe` finds object blocks in any `3slo` stream by their
+   self-referencing header dword (at block+8 the value equals block-0x2C). It
+   works on cuba.str, queens.str and miami.str and prints class id, object id,
+   name and the centre/min/max floats.
+2. `local/strnear.exe` walks all 2304 streams and lists blocks within a radius of
+   a world position, so the object under the player can be found by coordinates.
+3. Block layout (confirmed on three files):
+
+       +0x00 class id (4) + a size/id (4)     +0x08 self-reference (block-0x2C)
+       +0x18 object id (8)                    +0x20 name (NUL-padded ASCII)
+       +0x2C centre (x, y, z, radius)         <- the position
+       +0x48 min (x, y, z, 1.0)               +0x58 max (x, y, z, 1.0)
+       +0x68 flags
+
+   The centre always equals (min+max)/2 - the same AABB-centre rule the engine
+   uses for characters in memory.
+
+4. Editing a float in the file and booting the game works: a +0.01 m change to
+   the centre of the "REISDORF" block at 0x8794 in cuba.str (a 131x42x87 m
+   complex 20 m from the player) loaded normally and the campaign ran.
+5. A +50 m change to the same block **crashed the game on load** - so the stream
+   is not integrity-checked (the SDAT field 0x3B004EB9 is identical in all three
+   streams, i.e. a format constant), but large displacements break the spatial
+   index / streaming. Small, bounded moves are safe.
+
+What this means for co-op: the file path can place or nudge objects and NPCs at
+load time (a real modding primitive), but it cannot drive a character per frame.
+The runtime path remains the SE's `.sgp` "SimGroup Override" injection, and the
+block layout above is exactly the vocabulary such an override would carry.
+
+Restore point: `gf2\cuba.str.orig` (byte copy of the untouched stream).

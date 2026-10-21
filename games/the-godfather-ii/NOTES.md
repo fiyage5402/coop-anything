@@ -583,3 +583,33 @@ from an ASI plugin. The remaining honest options are
    already makes an NPC walk after the player with full animation and
    pathfinding, so redirecting its follow target is the smallest real co-op
    primitive - it needs the follow order's target field, not the transform.
+### The SE engine-API map (new session, 2026-10-21)
+
+The SE calls game code indirectly: `mov eax, <game address>; ...; call eax`.
+Scanning GF2ASI.asi .text for `B8 <imm32>` with `imm` inside the game's image
+(0x00401000-0x00DEE000) yields **108 distinct game function addresses**, plus 10
+game data addresses. This is the working mod's whole engine API surface - the
+shortlist of functions that a real mod in this game actually uses.
+
+Top targets (call count, containing corpus function):
+
+| address | uses | function |
+|---|---|---|
+| 0x0044B82F | 10 | FUN_0044b820 - copies a 4x4 transform from `*(this+4)` into `this+0x50` via FUN_0044b4e0 |
+| 0x00408A00 | 5 | FUN_00408a00 - handle-hash lookup in `DAT_01162380` (world object registry) |
+| 0x00621530 | 2 | FUN_00621530 |
+| 0x004083D0 | 2 | FUN_004083d0 |
+| 0x00465E30 | 2 | FUN_00465e30 |
+| 0x006A100E | 2 | FUN_006a0840 |
+| 0x00483410 | 2 | FUN_00483410 |
+| 0x008C8A20 | 2 | FUN_008c8a20 |
+| 0x0043B870 | 2 | FUN_0043b870 |
+| 0x008C80D0 | 2 | FUN_008c80d0 |
+
+The full table (address, call count, containing function) is kept in
+`local/se-engine-api.txt` (private, gitignored). Reproduce with a byte scan of
+`GF2ASI.asi` .text for `B8` followed by a dword in the game's image range.
+
+Next session should read FUN_0044b820 and FUN_00408a00 first: the SE uses them
+for every entity it touches, and FUN_0044b820 looks like the transform refresh
+that our own writes failed to trigger.

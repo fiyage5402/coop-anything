@@ -890,3 +890,33 @@ Facts that now hold:
 Next: walk past the name registry to the object blocks (class id + attribute
 values) - that is where a transform lives - and confirm the block layout on two
 files at once so a wrong guess is visible immediately.
+### BREAKTHROUGH: object blocks with transforms found in the stream (2026-10-22)
+
+Past the name registry (ends at 0x4714 in cuba.str) the stream holds object
+blocks. First two, verbatim:
+
+    004714: 2F 70 16 FE 70 A0 00 00 | E8 46 00 00 00 00 00 00 | 00*8
+    00472C: 09 91 C8 37 62 CC B0 06                       <- object id (8 bytes)
+    004734: "CHAVEZ193"
+    00473D: -373.43  12.88  60.86  63.76                  <- floats
+    00475C: -411.12   3.07  10.39   1.00                  <- row with w = 1.0
+    00476C: -335.73  22.69 111.34   1.00                  <- second row with w = 1.0
+    00477C: 00 00 01 00 01 00 00 00                        <- small ints
+    004794: next block, same 8-byte class id, id 09 91 C8 37 06 21 23 0E,
+            name "CHAVEZ19", floats -311.23 11.83 -13.66 61.62 ...
+
+So each block is `[class id][size][object id][name][float payload]`, and the
+payload contains **matrix rows ending in 1.0** - exactly the transform layout we
+were hunting for in memory, now in a plain file that the engine loads.
+
+This is the first primitive that is both authoritative and writable without
+touching a running process: edit the float payload of an object block, write the
+`.str` back, and the engine will load the moved object.
+
+Next steps:
+1. write a block walker (offset, class id, object id, name, payload length) and
+   confirm the layout on cuba.str + queens.str + miami.str at once;
+2. identify which float group is the live position (compare two blocks of the
+   same class - e.g. several CALHOUN1 entries in queens.str - and see which
+   group differs per instance while the rest is constant);
+3. change one value, write the file, boot the game and look at the result.

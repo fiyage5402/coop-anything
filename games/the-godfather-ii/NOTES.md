@@ -956,3 +956,33 @@ The runtime path remains the SE's `.sgp` "SimGroup Override" injection, and the
 block layout above is exactly the vocabulary such an override would carry.
 
 Restore point: `gf2\cuba.str.orig` (byte copy of the untouched stream).
+### .sgp path: mechanism confirmed, format still unknown (2026-10-22)
+
+Strings in GF2ASI.asi spell the mechanism out:
+
+    simgroup_mods
+    ERROR: SimGroupOverride path [%s] does not exist!
+    .sgp
+    Detected SimGroupOverride file [%s]
+    Loaded behaviour [0x%X-0x%X-0x%X-0x%X] from ...
+
+So a behaviour is identified by a **four-dword GUID**, the loader scans
+`simgroup_mods` for `*.sgp`, and every file it accepts is logged. The `.sgp`
+extension check is in code at `0x10075FBC` (the string is appended and compared).
+The SE writes its own log to `scripts\GF2SE.txt` (startup lines only so far; no
+SimGroupOverride lines yet).
+
+Experiment: a copy of `cuba.str` (131072 bytes, the full 3slo stream) placed as
+`simgroup_mods\test1.sgp` **crashed the game at startup** - the process never
+appeared and the SE log gained nothing. Removing the file restored a clean start
+(PID 22548). So the SE does read `.sgp` files, but a stream copy is not the
+format it expects.
+
+Next step for this path: read the parser around `0x10075F60-0x10076610` (the two
+string references above) and recover the expected record layout - most likely a
+compact list of `[GUID][behaviour payload]` entries rather than a whole stream.
+
+Status of the two runtime routes:
+- script VM from the plugin: closed (three contexts, always fatal);
+- `.sgp` behaviour injection: mechanism proven, format pending;
+while the **file-edit route (object blocks in .str) is a working primitive**.

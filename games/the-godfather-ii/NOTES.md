@@ -1017,3 +1017,28 @@ behaviours) is required to go further; the parser itself is C++ STL-heavy around
 exists.
 
 Clean state restored: no `.sgp` files in `simgroup_mods`, game starts normally.
+### .sgp: what is still needed, stated plainly (2026-10-22)
+
+Answer to "what do you need from the .sgp": a **real working sample file**. With
+one, the layout is a ten-minute read; without one, every guess costs a boot and
+has so far produced either "0 behaviours mounted" or a crash:
+
+- 16 bytes = [class id 8][object id 8] of a real stream block: **safe, but 0
+  behaviours** (so the GUID form is plausible but the container around it is
+  wrong);
+- 16 bytes of header garbage: 0 behaviours;
+- count+GUID (20 B): crash;
+- GUID+zeros / GUID+GUID (32 B): crash;
+- full stream copy (131 KB) and a blocks-only slice (27.5 KB): crash.
+
+A sample can come from either of these, both of which need the owner:
+
+1. the SE author / mod page (a .sgp from any published SimGroup mod), or
+2. the Visceral Toolkit's own export: the Game Manager has an **Install Patch**
+   button next to Create Patch; installing `coop_test` may be what writes a
+   `.sgp` into `simgroup_mods` (the toolkit "authors" the format per the SE's
+   README). That is two clicks in the toolkit, which synthetic input cannot
+   reach.
+
+Everything else is in place: the detection path, the behaviour counter in the
+log, and a test loop that needs no game UI.

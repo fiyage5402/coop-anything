@@ -1215,3 +1215,45 @@ state machines so it animates and paths properly:
 * `AnimView` (at Animated+0x218) holds the current state id at +0x18;
   `AnimView::ChangeState` exists but is not decompiled in the SDK, so forcing an
   animation directly is not available yet
+
+### Networking step 2: two real clients, sync verified (same session)
+
+**Single-instance check found and bypassed.** The game refuses to start twice
+because it calls `FindWindowW(L"Godfather2WndClass", <window title>)` and exits
+when the call returns a window. Our plugin already hooks the import; the hook
+now returns NULL for that class:
+
+    findwindowW: single-instance check bypassed (NULL)
+
+With that, two full game instances run side by side on one PC. Each keeps its
+own profile through the SE's SHGetFolderPathAndSubDirW redirect
+(`<game dir>\profile`), so saves and settings do not collide. The game keeps
+running its frame loop while minimised/unfocused, so both instances update.
+
+**Two-client test (both in a campaign, same city):**
+
+    A: bind 47779, send to 47778, puppet target = a crew follower (0x059732A0)
+    B: bind 47778, send to 47779, puppet target = a live NPC   (0x05D117E0)
+
+Measured with peek.exe (positions read from both processes):
+
+    A puppet  (201.833, 10.216, -203.393)  vs  B player (201.849, 10.216, -203.371)  -> 2 cm
+    B puppet  (199.908, 10.210, -207.140)  vs  A player (199.990, 10.200, -207.188)  -> 9 cm
+
+B's console: `sent=8615 recv=9368 peerpos 199.99 10.20 -207.19 age=31`.
+Both directions of the co-op loop work at 20 Hz.
+
+**Lessons**
+
+* a puppet target must be a live Sentient: `obj+0x3D4` is a pointer to its
+  CharacterProxy. NPCs get despawned/recycled by the scheduler, and then the
+  address holds garbage and the puppet silently stops ("sometimes it
+  disappears"). Prefer crew followers that the game keeps alive.
+* several injected plugin builds fight over the UDP port; a clean restart with
+  one build in `scripts\` avoids it.
+* the remote player currently appears as a different NPC model; swapping it for
+  the protagonist's model is a separate step (TrySwapModel / PartedModelMgr).
+
+Next: drive the puppet through the game's own movement state machine (stable,
+animated, no sliding), give it the remote player's model, then move the
+transport to the Steam relay from playbook/networking-steam-spacewar.md.

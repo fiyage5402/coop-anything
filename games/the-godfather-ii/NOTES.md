@@ -800,3 +800,35 @@ Next session: either find the toolkit's edit/apply control (its plugin DLL
 contains the UI labels - grep it for `Behaviour`/`Apply`/`Save`), or take the
 `VPAT`/`.sgp` container apart from `coop_test.vpat` (66 bytes) plus a modified
 `cuba.str`, and write the container ourselves.
+### .str container and SimGroup name table decoded by hand (2026-10-21)
+
+No GUI needed after all. `cuba.str` (131072 bytes) starts:
+
+    00000: "3slo"  0C 00 00 00  02 00 03 00      magic, version 12, flags
+    0000C: "COHS" (SHOC reversed)  2C 00 00 00     chunk header
+    00010: "RDHS" (SHDR reversed) ...
+    00040: "TADS" (SDAT reversed) ...
+    00068: table of 24-byte records
+
+Each record is **name[16] + value[8]**: a 16-byte ASCII name, NUL padded,
+followed by an 8-byte value (GUID/hash fragment). Examples straight from the
+file:
+
+    "BRINKER2" + DB C1 C8 35 B0 1F 8C FE
+    "BOYD6799" + 64 2D C9 58 6B CE AE 96
+    "FOWLER20" + 27 FF C8 33 D2 09 32 AF
+    "AGAY2028" + 96 EB C8 33 D2 27 79 F2
+    "CALHOUN1" ...
+
+The repeated `C8 33` / `C8 35` bytes inside the values suggest a timestamp or
+type tag embedded in the id, and names are plain ASCII even though class and
+attribute names are SDBM hashes (the toolkit says so explicitly).
+
+So a co-op mod can edit game SimGroups **file-side**: parse the 3slo container,
+locate the SimGroup chunk, change object records, write the `.str` back. No
+toolkit, no GUI, no synthetic input. The remaining work is mapping the object
+records that follow the name table (class hash + attribute block) so a position
+or a behaviour can be changed.
+
+All of the above is reproducible with plain byte reads; the toolkit only served
+as an oracle that the game really loads these files.

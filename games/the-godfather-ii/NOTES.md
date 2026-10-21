@@ -679,3 +679,29 @@ The two viable next directions, unchanged in priority:
 
 The engine-API scan method and its trap are recorded above; the 26-function
 table is in `local/se-engine-api.txt`.
+### Scripts are Lua (from VisceralToolkit v1.4, read-only analysis) 2026-10-21
+
+The owner supplied `VisceralToolkit_v1.4.7z` (SHA-256
+2D9AC0607BC50B3DEC3F3D4F85434A13F841255BE9DB043B763EBCB92E115D6E). It is a
+binary application (VisceralApp.exe + Cauldron.dll + PhysX), so it was **not
+run**; only its strings were read. The plugin DLL contains the engine's
+resource-type table:
+
+    BricknMortarRes COVERNODETABLE GRAPH PartsDB MobFace TreeModel TOB
+    TRINITY_SEQ_MASTER **LUA LUAC** Mesh MeshVolatile Material Score
+    **SimGroup VariableDictionary** VFX UIX UIE SHK PFR MIX FFN HKX BNK APX WGI
+
+**The game's scripts are Lua / Luac (compiled Lua bytecode).** That settles the
+open question behind the "loose-file script" direction: the engine executes
+Lua, so a mod can in principle ship script payloads instead of fighting the VM
+from outside. The plugin also mentions a Resource Manager and StreamTOC, i.e.
+the `.str` streams carry these resources, and SimGroups/VariableDictionaries are
+first-class resource types.
+
+Saved list: `local/visceral-resource-types.txt`.
+
+Next: determine how the engine resolves Lua resources (inside the `GODFATH*.viv`
+/ `.str` streams) and whether the SE's loose-file loading can override a script
+path. If it can, the whole co-op primitive becomes a Lua script calling
+`SetPositionValues` in the engine's own context - the path we could not reach
+from C.

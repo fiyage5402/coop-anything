@@ -986,3 +986,34 @@ Status of the two runtime routes:
 - script VM from the plugin: closed (three contexts, always fatal);
 - `.sgp` behaviour injection: mechanism proven, format pending;
 while the **file-edit route (object blocks in .str) is a working primitive**.
+### .sgp experiments: detection works, the record format needs real GUIDs (2026-10-22)
+
+The SE's log lives at the game folder root (`<copy>\GF2SE.txt`, not under
+`scripts\`). With a `.sgp` present it logs:
+
+    Detected SimGroupOverride file [C]
+    Finished SimGroupOverride file [C], with a total of 0 behaviours mounted.
+
+That gives a clean test loop with no game UI at all: drop a file, start the game,
+wait ~15 s, read the log, kill the process.
+
+Experiments (all in `<copy>\simgroup_mods\`, one at a time):
+
+| file | contents | result |
+|---|---|---|
+| test1.sgp | full copy of cuba.str (131072 B) | game crashes, no log line |
+| testE.sgp | blocks-only slice (27520 B from 0x4714) | game crashes, no log line |
+| testA.sgp | 16 bytes from the stream header | game alive, log: **0 behaviours** |
+| testB.sgp | count(4)=1 + 16 bytes | game crashes |
+| testC.sgp | 32 bytes (two 16-byte values) | game crashes |
+
+So the loader accepts the file and counts behaviours, but the parser is strict:
+the values must be **valid behaviour GUIDs** (the loader logs them as
+`Loaded behaviour [0x%X-0x%X-0x%X-0x%X]`, i.e. four dwords = a 128-bit id). The
+bytes I fed it came from the stream's SHDR header, which is not a behaviour GUID,
+hence the crash. A real `.sgp` sample (or the exact GUIDs of live SimGroup
+behaviours) is required to go further; the parser itself is C++ STL-heavy around
+`0x10075F60-0x10076640` and not worth decompiling further until a real sample
+exists.
+
+Clean state restored: no `.sgp` files in `simgroup_mods`, game starts normally.

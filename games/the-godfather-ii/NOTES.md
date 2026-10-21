@@ -613,3 +613,27 @@ The full table (address, call count, containing function) is kept in
 Next session should read FUN_0044b820 and FUN_00408a00 first: the SE uses them
 for every entity it touches, and FUN_0044b820 looks like the transform refresh
 that our own writes failed to trigger.
+### Correction: the SE engine-API scan needs the `call eax` check (2026-10-21)
+
+The first scan of GF2ASI.asi for `mov eax, <game address>` produced 108 hits, but
+many were **division magic constants**, not function addresses (for example
+0x0044B82F is the magic number the compiler uses for an unsigned 64-bit divide;
+0x3B9ACA00 nearby in the same sequence confirms it). The map must only keep
+entries where `mov eax, <addr>` is followed by `call eax` (`FF /2` with a
+register operand) within the next 16 bytes.
+
+With that check the real surface is **26 engine functions**:
+
+| address | uses |
+|---|---|
+| 0x00408A00 | 5 (handle registry notify: walks subscribers in `DAT_01162380`) |
+| 0x008C8A20 | 2 |
+| 0x004083D0 | 2 (subscriber/message helper, calls 0x00408A00) |
+| 0x00465E30 | 2 (type dispatcher on `param_2` 0x11/0x12) |
+| 0x00483410 | 2 |
+| 0x0043B870 | 2 (array-of-pointers index via `this+0x34/0x38`) |
+| ... plus 20 more with one call site each |
+
+`local/se-engine-api.txt` now holds this corrected table with call sites.
+Lesson for the write-up: indirect-call maps must validate the `call`, never
+trust an immediate that merely falls inside the image range.

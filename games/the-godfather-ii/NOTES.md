@@ -655,3 +655,27 @@ the one used by the constructor at 0x10074760.
 
 So the "read the object the SE trusts" shortcut is closed too. `modlist.exe`
 is kept: it is the only way to get 32-bit module bases here.
+### How the SE really drives the game: events, not direct calls (2026-10-21)
+
+Restricting the engine-call scan to the crew-menu code region
+(0x1008C000-0x10090000) leaves exactly one game call: site 0x1008F377 ->
+**0x00408A00**, the handle-subscriber registry. So the SE does not call "spawn"
+or "set position" engine functions for crew operations; it dispatches an event
+against an entity handle and lets the game's own subscribers react
+(`FUN_00408a00(handle_struct, flag)` walks the subscriber list stored in the
+hash table `DAT_01162380` and calls each subscriber's vtable slot +4).
+
+That reframes the whole problem: the game's character behaviour is event-driven
+and the right primitive for co-op is an **event/message** carrying a handle (and
+the game object that receives it), not a function call and not a memory write.
+The two viable next directions, unchanged in priority:
+
+1. **AI order / follow target**: find the crew-follow order's target field so a
+   second client can steer the companion by orders (the engine keeps animation
+   and pathfinding). Smallest real co-op primitive.
+2. **Loose-file scripts**: make the engine load and run script payloads from
+   disk (the SE advertises loose-file loading), then the full script API is
+   available in the proper context.
+
+The engine-API scan method and its trap are recorded above; the 26-function
+table is in `local/se-engine-api.txt`.

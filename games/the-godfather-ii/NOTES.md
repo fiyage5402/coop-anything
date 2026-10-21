@@ -558,3 +558,28 @@ attempt from a context that is by construction part of the script pump.
 
 The interpreter hook is removed again from the shipped plugin (it was a
 diagnostic); the plugin is back to the stable hook set.
+### Script VM is closed to external calls (2026-10-21, final)
+
+Third context tried: a hook on the script pump `FUN_004cb0c0` (prologue
+`55 8B EC 83 E4 F8`, state in EAX, context in ECX, one stack dword). A byte stub
+re-pushes the stack arg, calls the trampoline, then calls `pump_after()`, which
+issues `FUN_00468ea0("GetPlayerPosition")` right after the pump's own
+`FUN_006255e0` stack cleanup, and finally `ret 4` like the original. The log
+recorded `pump: after cleanup, calling VM` and the process died before the call
+returned.
+
+Result across three contexts (camera hook, raw invoke with the continuation,
+and inside the script pump after its cleanup): **the VM cannot be called from
+plugin code at all**. Its global state is only valid while the game itself is
+executing a script instruction; any external call corrupts it.
+
+Consequence: the engine's script API is not a usable primitive for a co-op mod
+from an ASI plugin. The remaining honest options are
+
+1. make the game's own script system run our code (loose-file loading - the SE
+   advertises loose-file loading, so the engine evidently accepts script
+   payloads from disk; the format must be determined), or
+2. drive the game's own AI instead of the transform: the crew-follow behaviour
+   already makes an NPC walk after the player with full animation and
+   pathfinding, so redirecting its follow target is the smallest real co-op
+   primitive - it needs the follow order's target field, not the transform.

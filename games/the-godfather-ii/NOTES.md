@@ -1095,3 +1095,86 @@ stream name hash (`h*65599 + lowercase(c)`).
 
 This is the co-op foundation: move a character with the engine's own Teleport
 (0x0079E3C0) or drive an NPC's seek/follow state machine, no memory poking.
+## Session log 2026-10-22: the movement primitive, verified in game
+
+**The correct player chain** (the SDK's `GetLocalPlayer() - 0x7CC` is wrong for
+this build; it lands inside the object):
+
+    pm     = *(void**)0x012233A0              PlayerManager singleton
+    base   = ((void**)*(pm+4))[0]             m_PlayerArray[0] (BasePlayer)
+    Player = base - 0x1F30                    BasePlayer sits inside Player
+
+Live check: base 0x14AF9A50 -> Player 0x14AF7B20, vtable 0x00D6B350, and the
+entity transform at Player+0x90 holds exactly the player's position.
+
+**Entity transform layout** (matches entity.h, verified live):
+
+    +0x90   local matrix (right 0x90, up 0xA0, at 0xB0, pos 0xC0)
+    +0xD0   world copy   (same matrix, pos at +0x100) - SetPosition writes here
+    +0xC0   the "feet" position used by scripts and the HUD (y = world y - 0.945)
+
+**Vtable slots** (player vtable 0x00D6B350; slot 8 is the anchor - the SDK's
+own SetMatrix address 0x0046F9C0 sits there in all 58 Entity-derived vtables
+the exe scan found):
+
+    slot 7 = SetPosition(const RwV3d*)   player: 0x007FF4B0 -> base 0x0046F7B0,
+                                         then CharacterProxy (obj+0x3C0)
+                                         SetPosition (0x00551260) and a linked
+                                         object at obj+0x1E88
+    slot 8 = SetMatrix = 0x0046F9C0      writes the rotation part to +0xD0 and
+                                         keeps the position from +0xC0
+
+Any Entity-derived object moves with
+`((void(__thiscall*)(void*, const float*))(*(void***)obj)[7])(obj, xyz);`
+
+**Call-context requirement** (cause of two crashes before it was understood):
+
+The base SetPosition ends by calling vtable slot 26, which for the player is
+0x004703C0: it appends the new matrix to a per-frame deferred list whose head
+is `*(0x01206880)`. Outside a live frame that global is null and the append
+crashes at 0x00470413 (`mov edx,[esi+0x14]`, esi = 0). The queue is live only
+during the game's deferred-callback phase; the matrix composer hook
+FUN_0088d6e0 runs there, so all engine calls are made from that hook now.
+
+**Verified in game (the owner watched it happen):**
+
+* `lift 0.5` on the player - the character rises 0.5 m per call and falls back,
+  which reads as a jump. The engine's own fly mode uses the same call.
+* **the puppet**: calling an NPC's SetPosition every frame with the player's
+  position + a fixed offset glues that character to the player. The owner's
+  crew companion teleported to player + (5, 0, 5) and then moved with the
+  player ("stuck to me", screenshots). This is the co-op puppet primitive
+  working end to end: a second character driven entirely by our code.
+
+**Tooling built this session** (all in local/, not in the repo):
+
+    vtscan.exe   find an address in a PE and report the vtable slot it sits in
+    peek.exe     read another process: dump / p / player / scan (lists Entity
+                 objects near a point by checking vtable slot 8 == 0x0046F9C0)
+    inject.exe   LoadLibraryA into the running game - test a new build with no
+                 restart
+    coopcore.asi file-driven command console: write coop_cmd.txt next to the
+                 game, read coopcore_cmd.txt. Commands: status, tp, tr, lift,
+                 obj, puppet, puppet off, read, writef, vtdump, callslot,
+                 calladdr, npcscan. Engine commands queue themselves until a
+                 live frame is available.
+
+**Crash lessons (do not repeat)**
+
+* never call engine functions when the game is not in a frame (menu, load,
+  background) - see the deferred-list null above
+* the old exception handler retried the same faulting instruction 5000 times,
+  turning one bad read into a crash loop; it now gives up after 5 retries
+* memory scans must re-check page protection at every page boundary and only
+  run during gameplay; the heap churns during loading
+
+**Open items**
+
+* the puppet keeps its walk animation because its AI still tries to move; freeze
+  the animation or use a "neutral" character instead of a crew member
+* class 0xD60DF8 objects (found by the scan) moved in memory but were not
+  rendered - they are not streamed/active; the visible classes seen live are
+  0xD626D8 (crew), 0xD6A2A8, 0xD81DB0 and the player's 0xD6B350
+* next: pick a visible spare character as the puppet, drive it from a second
+  input stream (fake a remote player), then networking
+  (playbook/networking-steam-spacewar.md)

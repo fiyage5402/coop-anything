@@ -1178,3 +1178,40 @@ FUN_0088d6e0 runs there, so all engine calls are made from that hook now.
 * next: pick a visible spare character as the puppet, drive it from a second
   input stream (fake a remote player), then networking
   (playbook/networking-steam-spacewar.md)
+
+### The "second player" route demo (same session)
+
+Added to the plugin console:
+
+    route <addr> circle <radius> <speed>   walk a circle around the player's
+                                           current position, facing the tangent
+    route off
+
+`route_apply()` runs in the same live-frame context as the puppet, calls
+`SetPosition` every frame and `SetMatrix` (0x0046F9C0) with an orthonormal
+basis built exactly like the SDK's `SetHeadingToDirection` (up = 0,1,0;
+at = direction; right = up x at). Result, measured from outside with peek.exe:
+the puppet traced a perfect 6 m circle around the player at 1.5 m/s and the
+owner watched it walk the circle in game.
+
+**Character vs prop**: a real character (Sentient) has a valid pointer at
+obj+0x3D4 (the flag guarding the CharacterProxy call) and its proxy at
+obj+0x3C0; props with the same Entity vtable have garbage there (a float).
+The scan used this to tell characters (class 0xD626D8 - crew/NPC) from props
+(0xD60DF8, 0xD6A2A8, 0xD81DB0).
+
+**Known limitation - no walk animation.** The puppet slides in an idle pose:
+the animation comes from the character's state machine (its AI), not from the
+position. The companion looked right earlier only because its own AI wanted to
+move. The correct next step is to drive the character with the game's own
+state machines so it animates and paths properly:
+
+* `Sentient::GetRootStateMachine()` = `m_SmTree.GetRoot()` (Sentient layout in
+  the SDK; m_CharacterProxy confirmed at 0x3C0)
+* the SM system is documented: `StateMachineParams` (class id + TransitionList),
+  `StateMachine::AddChild/SpawnChild/SetExternalTransitions`, factories such as
+  `S_SeekToPositionSM_FactoryFn` (SeekToPositionSM ctor 0x075E510), and the NPC
+  behaviour SMs `seektopositionsm`, `npcfollowsm`, `crewcommandsm`
+* `AnimView` (at Animated+0x218) holds the current state id at +0x18;
+  `AnimView::ChangeState` exists but is not decompiled in the SDK, so forcing an
+  animation directly is not available yet

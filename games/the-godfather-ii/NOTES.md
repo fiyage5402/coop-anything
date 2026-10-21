@@ -705,3 +705,32 @@ Next: determine how the engine resolves Lua resources (inside the `GODFATH*.viv`
 path. If it can, the whole co-op primitive becomes a Lua script calling
 `SetPositionValues` in the engine's own context - the path we could not reach
 from C.
+### SimGroup class model from VisceralToolkit v1.4.0.5 (2026-10-21)
+
+Second archive: `VisceralToolkit_v1.4.0.5.7z`, SHA-256
+031103C8E9075660A4C857795A2802FD60D648977F4D861B4289BA45F550D7BA, 17.5 MB.
+It ships `Content/databases/gf2_simgroup.db`, a JSON description of the game's
+script object model (22 classes, attributes with types, 18 enums). Read only, the
+application was not run.
+
+Relevant facts:
+
+- **`CSystemCommands` has `m_Matrix : matrix`** - script objects can carry a
+  transform, which is how the engine's own teleport/spawn paths work.
+- `SimNPC` attributes are only identity/social data (`m_NPCGuid`,
+  `m_SocialClass`, `m_ClothingFormality`, `m_Climate`, `m_Palette`,
+  `m_RoleNameHashID`, `m_CityNameHashID`, `m_Flags`) - **no position and no
+  follow order**, so movement lives on the entity/physics side, not on the
+  SimNPC record.
+- `SimNPCFlags` enum: `KEEP_OUT_OF_SPAWN_POOL`, `DONT_GIVE_DYNAMIC_JOBS`,
+  `OUT_OF_STRATEGY_GAME`, weapon licenses, `CANNOT_BE_RESPONDER`,
+  `NOT_MADEMAN_UNTIL_RECRUITED`, `CANNOT_BE_UPGRADED` - none is a crew/follow
+  flag.
+- `Entity`: `m_IGCOptions`, `m_Model` (guid128), `m_Group`, lighting flags.
+- `StreamScripter`: eight `m_TargetN` guid128 slots plus stream visibility
+  events - a ready-made "point at entities" mechanism scripts use.
+
+Full model saved to `local/gf2-simgroup-model.txt` (private reference).
+Next: a script payload (Lua/Luac) is the only place where `SetPositionValues`
+and the behaviour commands are callable; the class model above is the vocabulary
+that script must use.

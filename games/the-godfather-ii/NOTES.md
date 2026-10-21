@@ -637,3 +637,21 @@ With that check the real surface is **26 engine functions**:
 `local/se-engine-api.txt` now holds this corrected table with call sites.
 Lesson for the write-up: indirect-call maps must validate the `call`, never
 trust an immediate that merely falls inside the image range.
+### SE object hunt: negative result (2026-10-21)
+
+A 32-bit module lister (`local/modlist.c` -> `modlist.exe`) was needed because
+64-bit PowerShell only sees the WOW64 modules of the 32-bit game. With it:
+**GF2ASI.asi base = 0x6D780000**, coopcore.asi = 0x70C40000, cooptest.asi =
+0x734B0000.
+
+The plan was to find the NPC Inspector's own object in memory and read its
+`+0x10` context, then `*(context)` (the inspected entity) and its `+0xD0`
+matrix. It failed: searching RW memory for the class vtable
+(0x100EBC8C relocated -> 0x6D86BC8C) returned 0 hits, and so did searches for
+the inspector entry (0x6D811740) and the position reader (0x6D814730). Those
+function addresses only ever appear as direct call operands inside RX code,
+which the value scanner does not read, and the inspector's class vtable is not
+the one used by the constructor at 0x10074760.
+
+So the "read the object the SE trusts" shortcut is closed too. `modlist.exe`
+is kept: it is the only way to get 32-bit module bases here.

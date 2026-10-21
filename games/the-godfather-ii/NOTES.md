@@ -832,3 +832,31 @@ or a behaviour can be changed.
 
 All of the above is reproducible with plain byte reads; the toolkit only served
 as an oracle that the game really loads these files.
+### Hash variant check and where the file work stands (2026-10-21)
+
+`local/sdbm.c` -> `sdbm.exe` computes the SDBM hash (the algorithm the toolkit
+documents). Results:
+
+- `sdbm("simgroup")` = **0xCCB51828**
+- the toolkit showed the SimGroup type hash as **0xCC5B1828**
+
+They are close but not equal, so the engine's variant differs in seed or in a
+final step, and the toolkit's "Type Name" value is not simply the lowercase
+SDBM of the class name. Treat the exact hash function as **open** - compute it
+from a confirmed pair before relying on hash matching to find records.
+
+What is solid from this session:
+
+1. `.str` is a chunk container: `3slo`, version 12, then chunks whose magics are
+   stored reversed (`COHS`=SHOC, `RDHS`=SHDR, `TADS`=SDAT).
+2. After the chunk headers a table of **24-byte records** starts: a 16-byte
+   NUL-padded ASCII name plus an 8-byte value. Object names are plain text
+   (`BRINKER2`, `BOYD6799`, `FOWLER20`, `AGAY2028`, `CALHOUN1`, ...).
+3. The toolkit can read and rewrite these files (it made a backup and updated
+   `cuba.str` + `coop_test.vpat`), but its hex view did not register edits, so
+   the actual write path still has to be done by us.
+
+Next: parse the SimGroup chunk record-by-record (name table first, then the
+object blocks), identify which 8-byte values are GUIDs vs hashes, and locate the
+attribute block that holds a transform. Everything is plain byte work on the
+test copy - no toolkit, no GUI, no synthetic input.

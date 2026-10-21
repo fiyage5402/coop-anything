@@ -528,3 +528,33 @@ script update (the function that pumps the VM each frame - the VM owner is
 `DAT_012233f4`, its interpreter entry `FUN_00635ab0` reached from
 `FUN_00636570`), hook that function, and issue the `FUN_00468ea0` call from
 inside it while the VM is live. Only then is `SetPositionValues` reachable.
+### Script VM driver chain mapped (new session, 2026-10-21)
+
+A temporary inline hook on the VM interpreter `FUN_00635ab0` (prologue is
+exactly 6 bytes: `55 8B EC 83 EC 50`) logged every distinct caller while the
+game booted and loaded a campaign. Three drivers exist:
+
+- `0x006278A5` - `FUN_00627840`, the VM state constructor (init call with the
+  callback `0x00627560`).
+- `0x00636727` - `FUN_006366f0`, the "run a script" helper (callback
+  `0x00636660`).
+- `0x006365A5` - `FUN_00636570`, the invoke (continuation `0x006261E0`).
+
+Static walk up from there:
+
+- `FUN_006366f0` is called by `FUN_00626310` (thin wrapper) and `FUN_00629280`.
+- `FUN_00629280` is called by `FUN_004cb0c0`, `FUN_0062e4c0`, itself.
+- **`FUN_004cb0c0`** is the interesting one: it runs the pending script
+  (`FUN_00629280`), and if that yields it invokes the continuation via
+  `FUN_00636570(&LAB_006261e0, ...)` with the frame derived from
+  `*(state+8) - *(state+0x1c)`, calls an optional callback, then **always calls
+  `FUN_006255e0`** (the VM stack cleanup). Callers: `FUN_00480d90` (the "gGUID"
+  script call), itself, and `FUN_004ffbf0`.
+
+So the VM is pumped by `FUN_004cb0c0`; after its `FUN_006255e0` the stack is
+clean. The next experiment is to hook `FUN_004cb0c0` (or its callers) and issue
+`FUN_00468ea0("SetPositionValues", ...)` right after the cleanup - the first
+attempt from a context that is by construction part of the script pump.
+
+The interpreter hook is removed again from the shipped plugin (it was a
+diagnostic); the plugin is back to the stable hook set.

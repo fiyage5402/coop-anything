@@ -1257,3 +1257,63 @@ Both directions of the co-op loop work at 20 Hz.
 Next: drive the puppet through the game's own movement state machine (stable,
 animated, no sliding), give it the remote player's model, then move the
 transport to the Steam relay from playbook/networking-steam-spacewar.md.
+
+### Plan fixed 2026-10-22: world/state synchronization layers
+
+Position-only sync is not co-op: each client simulates its own world (NPCs,
+vehicles, story flags). Per the playbook (how-coop-mods-work.md: retrofits on
+closed engines are host-authoritative state sync; enemy/creature positions are
+often not synced, spawns/health/deaths are):
+
+| Layer | What it syncs | Fixes | State |
+|---|---|---|---|
+| 1 | player position (xyz) | remote player visible | done (2 cm / 9 cm) |
+| 2 | player state: yaw, animation state, in-vehicle, weapon/action | "can't see him shooting / driving" | in progress |
+| 3 | world actors: nearby NPCs and vehicles (host lists them, client mirrors) | "NPCs differ" | planned |
+| 4 | story/event flags (find the game's flag store) | "events differ" | planned |
+
+Layer 2 data sources (all documented in the SDK / verified live):
+
+    yaw          entity matrix "at" vector at player+0xB0 -> atan2(at.x, at.z)
+    anim state   Animated::m_AnimViewInfo at player+0x218,
+                 AnimView::m_StateId at animView+0x18
+    in vehicle   Sentient::m_Vehicle (SafePtr) at player+0x1E40
+    action       AnimView state id + IsPlayingAction (0x045EEC0)
+
+Applying the animation on the puppet is the open problem: AnimView::ChangeState
+is not decompiled in the SDK (no address), so layer 2 starts with yaw + packet
+fields for anim/vehicle, and the state application will be solved next (find
+ChangeState by RE, or drive the puppet's own state machine).
+
+### Layer 2 progress: state in the packet + a working animation primitive
+
+**Packet v2** (32 bytes): `G2CP` u16 version u16 flags f32 x f32 y f32 z
+f32 yaw u32 animState u32 reserved.
+
+* yaw read from the entity matrix "at" vector at player+0xB0
+  (`atan2(at.x, at.z)`), applied to the puppet with SetMatrix through the same
+  orthonormal basis the engine uses;
+* animState read from `Animated::m_AnimViewInfo` (player+0x218) +
+  `AnimView::m_StateId` (animView+0x18) - verified live: the player's idle
+  state id is 0x1193FB8B;
+* flags bit 0 = `Sentient::m_Vehicle` (player+0x1E40) non-null.
+
+**Playing an animation on any character works.** `SentientSM::PlayAnim` is
+0x080E570 (documented in the SDK). The hard part was finding the sentient's
+root state machine: the SDK padding does not give `Sentient::m_SmTree`'s offset
+(the area at +0x3AC holds a string, not the tree). The plugin now finds the
+root SM by scanning the entity for a pointer P where `[P]` is a code pointer
+(in the game **or an ASI module** - the SE replaces the player master SM with
+its own class, so the vtable lives in GF2ASI.asi) and `[P+0x18]` (the SM's
+`m_Tree`) points back into the entity. Live test:
+
+    cmd: anim 0x14CC7B20 0x1193FB8B -> ok      (game alive, state unchanged)
+
+`netsync_apply` now sets the puppet's heading every frame and calls PlayAnim
+when the peer's state id changes. State ids are CCT name hashes, so the same
+name should mean the same id across character models (to verify with two
+clients).
+
+**Operational note:** several injected plugin builds in one process race for
+the UDP port and for the command file; a clean start with one build in
+`scripts\` is the supported configuration.

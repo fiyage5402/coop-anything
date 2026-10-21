@@ -1317,3 +1317,37 @@ clients).
 **Operational note:** several injected plugin builds in one process race for
 the UDP port and for the command file; a clean start with one build in
 `scripts\` is the supported configuration.
+
+### End-of-block state (2026-10-22, owner away)
+
+**Build:** `coopcore_v18.asi` (local/coopcore.c) - packet v2 (position, yaw,
+anim state, vehicle flag), heading + PlayAnim on the puppet, smooth
+interpolation (snap over 5 m, lerp 0.35/frame otherwise), console with
+status/tp/tr/lift/obj/puppet/route/net/anim/read/writef/vtdump/callslot/
+calladdr/npcscan, single-instance bypass, all the safety guards.
+
+**Running at hand-off:** instance A (owner's, PID 16328) keeps the session with
+several injected builds (its `scripts\coopcore.asi` is the pre-session build and
+is locked while the game runs, so it could not be updated). Instance B (test
+copy) was stopped and its `scripts\coopcore.asi` is v18.
+
+**To get a clean two-client test:**
+1. close instance A (or restart it) so `scripts\coopcore.asi` can be replaced
+   with v18 in its directory too;
+2. start both, load a save in each;
+3. in each instance run `status` via `coop_cmd.txt`, then set the puppet target
+   (the addresses are per-process; find a live Sentient with `peek scan` and
+   check `obj+0x3D4` is a pointer, i.e. a CharacterProxy);
+4. configs: A `port 47779 peerport 47778`, B `port 47778 peerport 47779`.
+
+**Next work (in order):**
+* layer 3 - world actors: the host must send its nearby actor list and the
+  client mirror it. Needs a cheap way to enumerate actors (scanning the heap
+  every frame is too slow; look for the game's actor/NPC registry first) and a
+  way to spawn/reuse characters. Rough fallback: move the client's nearest
+  spare Sentients to the host's actor positions (same layout, different models).
+* layer 4 - story/event flags: find the game's flag store (quest stages,
+  globals, event flags), send the host's values, apply on the client.
+* polish - give the puppet the remote player's model (PartedModelMgr /
+  TrySwapModel), and drive movement through the seek state machine so the
+  animation and pathing come from the game.

@@ -734,3 +734,39 @@ Full model saved to `local/gf2-simgroup-model.txt` (private reference).
 Next: a script payload (Lua/Luac) is the only place where `SetPositionValues`
 and the behaviour commands are callable; the class model above is the vocabulary
 that script must use.
+### THE DOOR: SimGroup Override (.sgp) injection (2026-10-21)
+
+The game folder (as staged by the SE bundle) contains a `simgroup_mods` folder
+whose README states the mechanism verbatim:
+
+> GF2ASI supports "SimGroup Override" files authored by Visceral Toolkit. There
+> is no limit to the number of files GF2ASI will load, nor is a limit to number
+> of behaviours to inject. Any "SimGroup Override" files must have an extension
+> of "sgp" in order to be read. When the game loads a Stream file (*.str) which
+> consists of a SimGroup, the mod will inject any detected modded behaviours.
+
+This is the first real door into the engine's own script layer:
+
+- a `.sgp` file placed in `<game dir>\simgroup_mods\` is read by GF2ASI;
+- when the game loads a SimGroup stream, the mod **merges the modded behaviours**
+  into it;
+- SimGroup behaviours are the script objects whose class model we now have
+  (`local/gf2-simgroup-model.txt`), including `CSystemCommands` with
+  `m_Matrix : matrix`.
+
+So a co-op mod can ship `.sgp` payloads that add/replace behaviours on game
+SimGroups without touching the exe, the VM from C, or memory.
+
+Format work needed: the `.sgp` container is authored by Visceral Toolkit; it is
+almost certainly the same SimGroup stream layout the game already loads from
+loose `.str` files (about 2300 of them ship with the game). Two ways forward:
+
+1. Author a minimal `.sgp` with Visceral Toolkit on the owner's machine (the
+   toolkit is a user-supplied 64-bit GUI; it was not run so far) and inspect the
+   bytes;
+2. Reverse the SimGroup stream layout from the game's own loose `.str` files and
+   the toolkit plugin's serializer, then generate `.sgp` ourselves.
+
+Option 1 is a few clicks for the owner and immediately gives a ground-truth
+sample; option 2 keeps everything in-house. Both end at the same place: our
+behaviour inside a SimGroup, where the engine's own script API is callable.

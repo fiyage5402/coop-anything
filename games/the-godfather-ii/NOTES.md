@@ -770,3 +770,33 @@ loose `.str` files (about 2300 of them ship with the game). Two ways forward:
 Option 1 is a few clicks for the owner and immediately gives a ground-truth
 sample; option 2 keeps everything in-house. Both end at the same place: our
 behaviour inside a SimGroup, where the engine's own script API is callable.
+### VisceralToolkit live session: what works, what does not (2026-10-21)
+
+Ran `CauldronApp.exe` from `VisceralToolkit_v1.4.0.5` (owner approval) against the
+test copy's `gf2` folder:
+
+- Created a game instance `gf2test` pointing at
+  `<copy>\gf2`. Instance metadata lands in `<copy>\gf2\_toolkit\game_instance.xml`.
+- Content Browser lists the streams; opening `cuba.str` (128 KB) shows its
+  resources: four `WGI`, `BricknMortarRes`, `VariableDictionary` and a
+  **`SimGroup` (26.88 KB)**.
+- Selecting the SimGroup opens a hex view with a resource header
+  (`IsModified: No`, a placeholder GUID) and readable SimObject names inside
+  the payload: `FOWLER20`, `FOWLER10`, `REI SDORF`, `WOLSKY4`, `BILLIEYB`,
+  `AGAY2026`, `CALHOUN1`. Names are stored as plain ASCII even though class and
+  attribute names are SDBM hashes.
+- Patches: `Create Patch` produced
+  `<copy>\gf2\_toolkit\wip_patches\coop_test.vpat` (magic `VPAT`, name, author,
+  then one entry per resource: `cuba.str`). Saving rewrote `gf2\cuba.str` and
+  created `gf2\_toolkit\backups\cuba.str`, but **the file was byte-identical** to
+  the backup - the hex edit never registered, so the patch stayed metadata-only.
+- `simgroup_mods` (where GF2ASI expects `.sgp` overrides) stayed untouched.
+
+So the toolkit already does the two things we wanted: it reads the SimGroup
+container and it writes patches with automatic backups. The missing piece is
+the editing gesture inside the SimGroup view (the hex view appears to be
+read-only, and no structural attribute editor was found in the menus we tried).
+Next session: either find the toolkit's edit/apply control (its plugin DLL
+contains the UI labels - grep it for `Behaviour`/`Apply`/`Save`), or take the
+`VPAT`/`.sgp` container apart from `coop_test.vpat` (66 bytes) plus a modified
+`cuba.str`, and write the container ourselves.

@@ -2203,3 +2203,38 @@ host 47779; B = PID 1252, hwnd `0x210D6C`, player `0x14EA7B20`, client
 `setfail=0`, `smfrz` 5928, `conv=31`. A walked from the start position to
 `182.006,10.224,-172.316`; B's `peerpos` followed `182.01,10.22,-172.32`.
 Windows arranged A `(0,0)`, B `(1280,0)`.
+
+## 2026-10-22, twenty-fifth session: v63 appearance scoring picks a player-like body
+
+**Change:** `pick_scored_target()` now adds an appearance bonus on top of the
+persistence score: assembly `player` +200, preset `unq_*` +100, preset
+`corleonerecruit*` +20, `wrk_female`/`maid*` -50. This makes the borrowed body
+prefer a player-like unique model instead of a nearby civilian. Built as
+`local/coopcore_v63.asi` (220672 bytes), deployed to both copies, both booted.
+
+**Result:** both clients now pick `unq_tommy_cipolla` / assembly `player` as
+the puppet (A target `0x05DD1C20`, B target `0x05D79220`), instead of the
+maid/dark-suited NPC. B's view shows a red-shirted player-like body standing
+ahead of its own player (`local/dual_v63_tommy_walk.png`). The exact player
+model is still not cloned, but the remote body now looks like a protagonist.
+
+**Walk sync:** A walked from `180.9` to `165.75`; B's puppet action SM
+(`0x1B353E00`, index at `+0x0C`) read `idx=6 name='Ped'` during the walk, and
+B's `peerpos` followed `165.75,10.22,-173.85`. `amatch=0 aapplied=0` remains:
+the visible animation is still the forced `Ped`, not CCT matching.
+
+**Action table check:** the Tommy action SM has `Ped` (6), `MeleeAttack` (31),
+`FireGunStationaryAction` (12), `DrawGunAction` (9), `ReloadGunAction` (11),
+so the v61 combat mapping is valid on this body. The `smnames` output is long;
+read the output file past the first 12 states.
+
+**Tooling warning:** `npcscan 30` blocks the game thread for about two minutes
+while it walks the address space; it did finish (3 entities) but stalls the
+session. Use the plugin's `read`/`partnames` on known addresses instead.
+
+**Live state:** A = PID 4916, player `0x14D67B20`, host 47779; B = PID 23000,
+player `0x14D37B20`, client 47778. Targets A `0x05DD1C20`, B `0x05D79220`
+(both Tommy); `calls/applied` 5255, `setfail=0`, `smfrz` 21064, `conv=31`.
+A at `165.75,10.22,-173.85`; B at the start `185.94,10.22,-172.2`. Windows
+arranged A `(0,0)`, B `(1280,0)`. Evidence:
+`local/dual_v63_tommy_walk.png`, `local/dual_v63_tommy_walk_live.png`.

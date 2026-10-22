@@ -2309,3 +2309,12 @@ animation works).
 **Live state:** A = PID 24808, player `0x14F1A9A0`, host 47779; B = PID 14600,
 player `0x14E37B20`, client 47778; A pos ~`177.8,10.22,-172.8`, B at start.
 A 10-minute soak is the next step; the 0x004C0BA1 crash must not recur.
+
+**v67 movement soak (~7.5 min):** 8 cycles of `W`/`S` movement on A, with
+`net`/`netdiag` queries every ~55 s. Both clients stayed alive; A
+`calls/applied=29105`, B `31121`, `setfail=0`, `posfail=0`, `snaps=0`,
+`smfrz` 113968/127556, `smstate` 2291/2296, `anim=0` (worker PlayAnim
+disabled), `conv=16/32`, `peerpos` tracking. No new `APPCRASH` event in the
+last hour: the `0x004C0BA1` crash did not recur under movement stress. This is
+stronger evidence that the worker `PlayAnim` on a freed body was the fault;
+a multi-hour soak is still open.

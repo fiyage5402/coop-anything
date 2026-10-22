@@ -2399,3 +2399,33 @@ the vehicle apply path is stable while the peer sits in the car. The actor
 scan is slow but did find 9 cars; `vehadd` remains the quick way to register a
 known car. The safe location is the Corleone Mansion driveway; the black
 family limo does not trigger an arrest.
+
+## 2026-10-22, thirty-first session: v71 vehicle validation and live drive sync
+
+**v71 changes:** `entity_is_vehicle` and `vehicle_getpos` now validate the
+world transform at **`+0x78`** (finite, within +-20000), not the local/part
+field at `+0xC0`; `vehicle_getpos` no longer falls back to `+0xC0`;
+`veh_note` requires a real vehicle and a valid position; `vehlist` prunes
+invalid entries. Version string is `coopcore.asi v71 loaded`, 224768 bytes.
+
+**Live drive test (both v71):** A (PID 9388, player `0x14DE7B20`) entered the
+black limo at the Corleone mansion; B (PID 25928, player `0x14F584A0`)
+received `fl=1`, `vclass=0x00D759AC`, `veh=10`, and `vapplied` climbed
+19072 -> 19458. A drove forward (173.48 -> 170.11 -> 169.54 -> 169.26) and
+then reversed to `180.763,10.161,-216.490`; B's `peerpos` followed each step,
+and B's car `0x0632A268` was at exactly the same position (e.g.
+`180.77,10.16,-216.49`). `setfail=0`, `posfail=0`, no crash. Evidence:
+`local/dual_v71_car_drive_sync.png` (A in the limo outside the mansion gate;
+B has the map open).
+
+**Caveat:** `vehlist` still contains stale/far class matches (e.g.
+`0x0639AE68` at `0.57,1.39,0.57` and several traffic cars 70-120 m away).
+`peer_vehicle_apply` only considers cars within 40 m of the peer, so these are
+not moved; a v72 cleanup should filter by distance/class and drop stale
+entries. The applied parked limo converges slowly (engine resets it between
+writes), but it did track the peer exactly during the drive test.
+
+**Live state:** A PID 9388, player `0x14DE7B20`, host 47779, inside the limo
+at `180.763,10.161,-216.490`; B PID 25928, player `0x14F584A0`, client 47778,
+at the mansion start with the map open. Both v71; B `veh=10`,
+`vclass=0x00D759AC`, `vapplied=19458`.

@@ -1649,3 +1649,31 @@ the matched body.
 * `netdiag` now also prints `act= amatch= aapplied= peeract=`.
 * `coop_net.cfg` key `actors 0` disables the world actor layer without touching
   the puppet sync.
+
+## 2026-10-22, sixth session: why the ambient crowd layer is off (and stays off)
+
+The actor layer worked technically - matched bodies sat 0.0-1.0 m from the peer's
+copy - but two problems showed up in play:
+
+1. **Crash.** A crashed with `veh: av at 0x2365004C write` (first-chance
+   access-violation logger): the process jumped to a garbage address, i.e. it
+   called something through a corrupted pointer. The write path is
+   `SetPosition` -> vtable slot 8, guarded by a vtable check; between that check
+   and the call the game can free the body (it streams NPCs constantly), so the
+   call goes through a stale vtable. With one puppet at 10 ms intervals the
+   window is small; with eight bodies at 10 Hz it is not.
+2. **Population growth / lag.** Pinning ambient pedestrians to the peer's
+   positions drags them out of their home area, so the NPC scheduler spawns
+   replacements - the crowd grows on both clients, which is exactly the
+   "NPCs spawn from both clients, it lags" effect the owner reported. FPS did
+   improve after the scan was throttled (40 ms/120 ms -> 20 ms/300 ms) and the
+   match cache was added, but the population effect remains.
+
+Decision: `actors 0` in `coop_net.cfg` on both clients (read live, no restart).
+The puppet layer (single borrowed crew body, 10 ms) stays on and remains stable.
+
+If ambient crowd sync is ever revisited, it needs (a) the engine's own identity
+for a body (SimManager maps the attribute-packet GUID to the live handler;
+NPC class `0xD7E44D6A`, vehicles `0x10E5319E`), and (b) application from inside
+the game's update (a hook that runs where the engine expects object mutation),
+not from an external thread writing to addresses that can be freed at any time.

@@ -1677,3 +1677,37 @@ for a body (SimManager maps the attribute-packet GUID to the live handler;
 NPC class `0xD7E44D6A`, vehicles `0x10E5319E`), and (b) application from inside
 the game's update (a hook that runs where the engine expects object mutation),
 not from an external thread writing to addresses that can be freed at any time.
+
+## 2026-10-22, seventh session: vehicle layer wired, not verified in game
+
+The packet now carries the class vtable of the peer's vehicle in the last field
+(offset 36, previously reserved), taken from `Player+0x1E40` (m_Vehicle). The
+other client looks for an object of exactly that class near the peer position
+and moves it by writing the entity matrix translation directly (`+0xC0`) - no
+engine call, so no crash risk like the crowd layer had.
+
+Measured so far:
+
+* `fl=1` arrives correctly: the client sees that the host is in a vehicle.
+* `vclass=0x00D759AC` arrives correctly (the class measured on the host).
+* The vehicle table stayed empty (`veh=0`) on the client: the resumable scan
+  window is `0x03000000-0x08000000`, where this build keeps characters, but the
+  car objects of the client were not inside it (or the client's world had no
+  car of that class near the peer). The direct matrix write is therefore still
+  unverified visually.
+
+Also learned:
+
+* Vehicles are a different hierarchy from characters: their vtable slot 7 is
+  `0x0046F4F0` and slot 8 is `0x0046C720` (characters: `0x007FF4B0` and
+  `0x0046F9C0`), so `entity_setpos`'s "vt[8] == SetMatrix" test rejects them.
+  The 0x46F4F0 disassembly shows `__thiscall` with one 4-byte argument and
+  `ret 4`.
+* The two game windows: host (test-se) is the right window, client (test-se-b)
+  the left one at 1280x720 each on this machine.
+
+Next: widen the scan window (or scan a box around the peer), confirm that a car
+of the peer's class exists on the client near the peer, and check visually
+whether writing `+0xC0` moves it. If not, call the vehicle's slot 7 with a
+position pointer (`__thiscall(void*, float*)`), which matches the observed
+`ret 4` signature.

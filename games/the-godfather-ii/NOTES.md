@@ -1731,3 +1731,61 @@ What is already in place and worth keeping: the packet carries the peer's
 vehicle class in the last field, the player's vehicle pointer is read from
 `+0x1E40`, and a vehicle table + nearest-selection + direct matrix write exist
 behind `peer_vehicle_apply`. They simply have nothing to attach to.
+
+## 2026-10-22, ninth session: why the animations never transferred, and the fix
+
+### Measurement (both clients, plugin `read` command, in-process)
+
+| what | host (A) | client (B) |
+|---|---|---|
+| player CCT root state id (`AnimView+0x18`) | `0x46F5C7B4` | - |
+| puppet CCT root state id | - | `0xE120D6BC` |
+
+The id sent in the packet is exactly the player's root state id, but the
+puppet's own root state id is a completely different number. **CCT state ids
+belong to the model, not to the game**: the crew recruit's idle state is not
+the player's idle state, so no id can be copied from one body to another.
+
+### The `anim` command never worked either
+
+`find_root_sm()` looked for a pointer P with a code vtable whose `[P+0x18]`
+points back into the entity, inside the first 0x400 bytes. Two mistakes:
+
+* the state machine stores its tree pointer at **+0x14** (`m_Tree`), not +0x18
+  (`m_Parent`), and the tree is embedded in the entity at `Sentient+0x4B4`;
+* the entity scan stopped at 0x400, but the tree lives at 0x4B4.
+
+So the search could not find the root state machine and every `anim` call
+reported `failed`. The SDK layout used now:
+
+```
+StateMachine  m_ExternalTransitions 0x00, m_StateTableID 0x04, m_CurStateIdx 0x08,
+              m_States 0x0C, m_EvalFlags 0x10, m_Tree 0x14, m_Parent 0x18,
+              m_ChildHead 0x1C, m_ChildTail 0x20, m_Next 0x24, m_TimeInCurState 0x2C
+State         m_Transitions 0x00, m_Name 0x04, m_EnterMessages 0x08
+Sentient      m_SmTree 0x4B4 (StateMachineTree { m_EvalFlags, m_Root })
+```
+
+### v46: the portable part of the animation state is the state *name*
+
+The state machine layer is shared by all bodies: its states have names
+("Locomotion", "GunCombat", ...), and a crew recruit has the same names as the
+protagonist. v46 therefore
+
+* reads the names of the current states of the whole state machine tree on the
+  host and puts them in the packet (`G2CP`, one length byte plus the names
+  joined with `|`, 63 bytes max);
+* on the client looks each name up in the puppet's own state tables
+  (`sm_find_state`) and forces that state (`m_CurStateIdx`), repeating the
+  force every 400 ms because the NPC's own AI keeps taking the state back.
+
+New console commands: `sm <obj>` (state machine tree with current state
+names), `smnames <obj>` (every state of every machine in the tree).
+
+### Tooling note: `peek` cannot be trusted for payload data
+
+`peek <pid> <addr> <n>` returned values that disagree with the same addresses
+read from inside the game by the plugin's `read` command (player position:
+peek 28.31/1.92/-26.28 versus in-process 171.69/10.46/-211.95). Pointers
+seemed to match, payload data did not. All measurements from now on use the
+plugin's own `read` command, which reads the game's real address space.

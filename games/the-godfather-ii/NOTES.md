@@ -1915,3 +1915,16 @@ sends the animation changes that overwrote the peer's state every frame.
 This should make the `animforce` counter drop to near zero and the animation
 sync hold without repeated forcing. If it instead freezes the puppet (EVAL
 flags are engine state and may have side effects), revert to v50.
+
+## 2026-10-22, thirteenth session: disabling transitions instead of update messages
+
+v51's EVAL_NOUPDATEMESSAGES (8) broke movement: it suppressed the kinematics
+update that the engine runs every frame, so the puppet's position write was
+overwritten by stale physics and the movement stuttered.
+
+v52 keeps update messages running (kinematics works) but clears
+EVAL_CHECKTRANS (4) on the root SM and both child SMs. With transitions
+disabled, the NPC's state machine stays in its current state and no longer
+overrides the peer's animation, while the engine still applies the position
+every frame. The original flags are saved and restored when the puppet is
+released.

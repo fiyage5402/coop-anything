@@ -2337,3 +2337,27 @@ player-model swap without a proper model-clone path.
 `185.94,10.22,-172.80`. `calls/applied` 34388/36619, `setfail=0`,
 `posfail=0`, `snaps=0`, `smfrz` 135236/149952, `conv=16/15`. Both v67,
 connected, alive.
+
+## 2026-10-22, twenty-ninth session: v68 worker target guard and fire-state detail
+
+**v68 changes:** the animation worker now applies state names only when the
+requested object is still the active `g_netTarget` (in addition to the
+`entity_is_animated_character` liveness check). This prevents a stale request
+from writing to a body after a target switch. Fire/aim mapping now
+distinguishes `strafe` -> `StrafeFire` and `RangedChase` -> `RangedChase`,
+falling back to `FireGunStationaryAction` otherwise. Built
+`local/coopcore_v68.asi` (222208 bytes), deployed to both copies, both booted.
+
+**v68 verification:** targets A `0x060E22E0` (`unq_tommy_cipolla`), B
+`0x0624B7C0` (`corleoneassociate_0033_main`, full action table). Walk: B's
+action SM read `idx=6` (`Ped`) twice while A moved `178.15`; `peerpos`
+followed. Punch: B's action SM read `idx=0x1F` (`MeleeAttack`) with the
+450 ms hold. A ~3.5-minute W/S movement soak stayed alive with
+`setfail=0`, `posfail=0`, `snaps=0`, `smfrz` 58108/63548, `conv=16/31`.
+No new APPCRASH. Trying to draw a gun on A produced `grappleAttempt` instead
+(A appears unarmed), so the `StrafeFire` branch is implemented but not yet
+observed in game.
+
+**Live state:** A = PID 9212, player `0x14E17B20`, host 47779, pos
+`168.06,10.22,-177.47`; B = PID 10672, player `0x14D37B20`, client 47778,
+pos `185.94,10.22,-172.73`. Both v68, connected.

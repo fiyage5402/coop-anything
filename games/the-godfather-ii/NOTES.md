@@ -2031,3 +2031,45 @@ above 0.8 m/s the action SM is forced to "Ped", below it to "Idle". Those are
 states of the NPC's own action table (measured with `smnames`: Idle = 5,
 Ped = 6, Follow = 24, FireGunStationaryAction = 12, StrafeFire = 13), so the
 body plays its own walking animation instead of sliding.
+
+## 2026-10-22, twenty-first session: autonomous boot, campaign co-op, side-by-side windows
+
+**Verified:** both disposable clients can be brought from a fresh start into
+the story campaign without touching the keyboard by hand, and position sync
+works end to end with a visible remote body.
+
+Boot sequence that worked on both copies (A `godfather2-test-se`, B
+`godfather2-test-se-b`): replace `movies\common\attract.vp6` with a copy of
+`mainmenu.vp6`, start the game, wait for the movie, then send scan-code
+`SendInput` keys (plain `wVk` events are ignored by the frontend):
+
+- `Enter`, `Esc`, `Enter`, left click -> autosave notice, frontend state
+  `0x00E5672C` becomes `0x24`;
+- `Enter` -> "Выбор сохраненной игры для загрузки" (state `0x11`);
+- `Enter` -> load the selected save, state `5`, player pointer becomes
+  non-null (A `0x14F17B20`, B `0x14E884A0`) at `(185.939, 10.224, -172.206)`.
+
+The `Esc` press opens/closes the pause menu; when the menu is open the game
+thread stops processing console commands, which earlier looked like a hang.
+
+With A host on UDP `47779` and B client on `47778` (peer `127.0.0.1`), both
+`net` lines showed `state=1`, matching `peerpos`, and `netdiag` on A showed
+`calls/applied` increasing with `setfail=0`, `reason=0`, `posfail=0`,
+`vt8=0x0046F9C0`. Moving A 8 m with `W` changed B's `peerpos` from
+`186.55,10.22,-172.33` to `177.76,10.22,-173.34`; B's screen then showed a
+second, grey-shirted character standing at A's position next to B's red-shirted
+player (`local/dual_close2.png`, `local/dual_A_near_B.png`). The body is a
+borrowed crew NPC, not a clone of the player model.
+
+Build mismatch observed: B runs the deployed v51 (`netdiag`/`sm` unknown),
+while A's in-memory build already has `netdiag`/`sm`/`net lerp` but not
+`resume`/`smfrz` (an older hot-injected v58/v59, not the current source). The
+v60 file `local/coopcore_v60.asi` (220160 bytes) is built but not deployed.
+
+Window layout helpers added under `local/`: `arrange.py` puts A at `(0,0)` and
+B at `(1280,0)` (both 1286x749, 2560x1440 desktop), `dualshot.py` captures
+`(0,0,2560,749)` so one screenshot shows both games, and `gamefocus.py`
+contains the scan-code keyboard, relative-mouse and Alt+Tab focus helpers.
+
+Next: deploy v60 to both copies, repeat the boot sequence, and test `resume`,
+`smfrz`/`smfreeze`, `net lerp` and `net reopen` against the working baseline.

@@ -1928,3 +1928,13 @@ disabled, the NPC's state machine stays in its current state and no longer
 overrides the peer's animation, while the engine still applies the position
 every frame. The original flags are saved and restored when the puppet is
 released.
+
+## 2026-10-22, fourteenth session: targeted AI suppression
+
+v52's EVAL_CHECKTRANS (4) alone still let the action SM send update messages
+that played the NPC's own animation after a short time. v53 adds
+EVAL_NOUPDATEMESSAGES (8) on the action SM only (the second child, 0x1B474E40)
+while keeping EVAL_CHECKTRANS (4) cleared on all three. The root SM still runs
+its update messages (kinematics), but the action SM no longer sends animation
+changes. This is the Jericho pattern: stop the body's own AI from touching the
+animation, keep the movement physics alive.

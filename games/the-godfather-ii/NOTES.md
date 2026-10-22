@@ -1586,3 +1586,66 @@ Arbitrary 32-bit values can be written from the console with `writef`: pass the
 decimal form of the float whose bit pattern is the value (denormals included,
 e.g. `1.121039E-44` writes `0x00000008`) - used to write string sizes and ASCII
 while testing.
+
+## 2026-10-22, fifth session: world actor sync (layer 3) works
+
+### What was built
+
+`coopcore` v39/v40 adds a world actor layer:
+
+* A background thread keeps a table of live characters (class `0xD626D8`) found
+  by a resumable, time-sliced scan of the `0x03000000`-`0x08000000` range (the
+  heaps where this build allocates characters; a full pass logs
+  `act: pass done n=<count>`). Entries are pruned at the end of every pass.
+* Every 200 ms each client sends the **eight characters nearest to its player**
+  as a `G2CA` datagram (v1): 12-byte header + 20 bytes per entry
+  (`x, y, z, yaw, typeHash`).
+* On receipt the other client matches every entry to its own table by
+  `typeHash` and nearest position (12 m), re-checks that the body is still a
+  live character of that type and has not moved more than 25 m from the sent
+  point, then eases the position towards the sent one (0.25 at 10 Hz, game
+  thread, via `SetPosition`). Characters within 10 m of the local player are
+  left alone so local AI there is not fought over.
+
+### Measured
+
+Both clients on the same save, loaded in the same district:
+
+* Actor tables: 17-25 characters; `amatch/aapplied` grew to 2314 on one client
+  and 901 on the other; `peeract=8` every tick; no `SetPosition` failures; the
+  puppet still converges in 15-16 ms with the actor layer running.
+* Same world NPC, same coordinates on both clients, e.g. type `0xCFCFCBF1` at
+  (175.6, -157.6) and type `0x8322C3C2` at (170.9, -161.5).
+
+### Models differ between clients - this is the game, not the mod
+
+The exact part preset of a world NPC is **randomised per client at spawn**: in
+one spot the same NPC is `preset='maid_0003_bskin'` on one client and
+`preset='maid_0001_heavy'` on the other, while the assembly (`wrk_female`) and
+the preset family (`maid`) match. That is why actor identity uses
+`assembly + preset family` rather than the full preset name, and why the models
+visibly differ although the positions match. Syncing the variant would mean
+sending the preset/theme/swap-set strings and applying them with `setparts` on
+the matched body.
+
+### Stability observations
+
+* One client exited twice with a normal log tail and no plugin error (no
+  `crash:` line). A first-chance exception logger (`veh:` lines,
+  `AddVectoredExceptionHandler`) is now in the build to identify such exits; the
+  current session with the actor layer has produced neither.
+* Never write to a table address without re-checking, at write time, the class
+  vtable, the live AnimView, the type hash and the distance - the table is only
+  refreshed once per scan pass, and a freed address can be reused by another
+  object between scan and apply. This was the most likely cause of the one
+  crash seen with the first actor build (v37).
+* Rotating NPCs is not done: `entity_heading` builds a matrix with a zero
+  translation and calls `SetMatrix`, which is one more engine call per NPC per
+  tick; position alone is enough for the layer to be useful.
+
+### Console additions
+
+* `actlist` - print the actor table (address, type hash, position, distance).
+* `netdiag` now also prints `act= amatch= aapplied= peeract=`.
+* `coop_net.cfg` key `actors 0` disables the world actor layer without touching
+  the puppet sync.

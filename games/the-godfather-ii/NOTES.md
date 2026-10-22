@@ -2238,3 +2238,37 @@ player `0x14D37B20`, client 47778. Targets A `0x05DD1C20`, B `0x05D79220`
 A at `165.75,10.22,-173.85`; B at the start `185.94,10.22,-172.2`. Windows
 arranged A `(0,0)`, B `(1280,0)`. Evidence:
 `local/dual_v63_tommy_walk.png`, `local/dual_v63_tommy_walk_live.png`.
+
+## 2026-10-22, twenty-sixth session: v64-v66 combat hold and action-table filter
+
+**v64:** the combat/fire action is now held for 450 ms after the peer's state
+stops naming it, so a short punch is not lost between the 250 ms mapping ticks.
+Direct read of the puppet action SM during/after a punch showed
+`idx=0x1F` (`MeleeAttack`); the body finishes the animation instead of snapping
+back to `Idle`.
+
+**v65/v66:** the auto-target now checks the candidate's state-machine tree for
+a real action table (`Ped` or `MeleeAttack`). Seated/prop characters have a
+reduced table (`sit`/`idle`/`cower`/`dead`) and were being picked because they
+were close; the scan now skips them. The appearance score also prefers
+`fam_corleone` (+100) and penalizes `wrk_female`/`maid*` (-200), and the
+fallback drops the target if no candidate has an action table instead of
+attaching the nearest seated NPC.
+
+**Result:** both clients now pick standing `corleoneassociate_*` bodies
+(assembly `fam_corleone`) with the full action table (`Idle`, `Ped`,
+`MeleeAttack`, `FireGunStationaryAction`, ...). B's view shows a red-shirted
+mobster body in the doorway ahead of its player
+(`local/dual_v66_associate.png`). Walk sync: B's puppet read `idx=6` (`Ped`)
+while A walked `176.7`; `peerpos` followed. Combat hold: A punched and the
+puppet action SM read `0x1F` (`MeleeAttack`). `amatch=0 aapplied=0` remains.
+
+**Live state:** A = PID 11000, player `0x14F87B20`, host 47779, target
+`0x0640A7E0` (`corleoneassociate_0007_main`), pos `176.88,10.22,-172.75`.
+B = PID 18568, player `0x14F27B20`, client 47778, target `0x063C78A0`
+(`corleoneassociate_0022_main`), pos `185.94,10.22,-172.73`. `calls/applied`
+2661/2866, `setfail=0`, `smfrz` 10580/11660, `conv=31`. Windows arranged A
+`(0,0)`, B `(1280,0)`.
+
+**Build:** `local/coopcore_v66.asi`, 222208 bytes; v64/v65/v66 were each
+deployed and booted, v66 is the live build. `resume` remains disabled.

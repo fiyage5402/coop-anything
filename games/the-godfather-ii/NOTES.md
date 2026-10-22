@@ -1479,3 +1479,29 @@ score candidates across scans (an address that keeps reappearing near the player
 over several scans is a follower) and prefer the highest score; a dedicated,
 engine-spawned body would be even better but model creation via
 `BuildModelFromSavedData` crashes on live characters.
+
+## 2026-10-22, third session: exact position match confirmed
+
+After the crew-scoring build (v32) both puppets sat **exactly** on the peer
+position, measured from the live process: A's puppet 169.49,-185.64 vs peer
+169.49,-185.64 (0.00 m), B's puppet 175.32,-186.65 vs peer 175.32,-186.65
+(0.00 m). `net` shows `target=<auto>`, `sent/recv` ~600-2400, `age` 16-47 ms.
+
+**Crew preference (v32)**: every scan records the class `0xD626D8` characters
+within 25 m; a persistent table increments a score for addresses that reappear
+and decrements the rest (`pick_scored_target`). The highest score wins, so a
+character that keeps showing up near the player (a crew follower) beats a random
+pedestrian. Scan log now prints `cands=<this scan>/<table>`.
+
+**Animation is the open layer.** Puppet state from `AnimView+0x18` is
+`0x90DCB113` (A) and `0x35E0B005` (B), while the packet carries the peer player's
+`0x46F5C7B4`. State ids are per-model (CCT state hashes resolved against the
+character's own state machine), so applying the peer's raw id to a borrowed body
+cannot work. Two ways forward: (a) give the puppet the peer's model via
+`PartedAnimated::TrySwapModel` (set-model helper `0x09C58C0`, needs assembly or
+preset names - `BuildModelFromSavedData` crashes on live characters), or (b) map
+the handful of gameplay states by name and translate ids per body.
+
+**Note**: one client (A) exited once during this session with a normal-looking
+log tail and no plugin error - no evidence it was the mod, but a crash handler
+that logs the exception address would settle it.

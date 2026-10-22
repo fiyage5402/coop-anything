@@ -1900,3 +1900,18 @@ v50 moves both off the game thread: the frame hook only posts a request
 
 Measured CPU while both clients run: host 57%, client 73% of one core (the
 game itself is the bulk of it).
+
+## 2026-10-22, twelfth session: disabling the puppet's AI
+
+The idea from Jericho Co-op: a puppet is a body whose AI is turned off
+(`oAI.bEnable = false`), so it no longer fights the networked state.
+
+In Visceral Engine the AI is the state machine tree at `Sentient+0x3AC`. Its
+eval flags live at `SM+0x14`. v51 sets `EVAL_NOUPDATEMESSAGES` (8) on the
+puppet's root state machine when it attaches and restores the original flags
+when the puppet is released. With update messages suppressed, the SM no longer
+sends the animation changes that overwrote the peer's state every frame.
+
+This should make the `animforce` counter drop to near zero and the animation
+sync hold without repeated forcing. If it instead freezes the puppet (EVAL
+flags are engine state and may have side effects), revert to v50.

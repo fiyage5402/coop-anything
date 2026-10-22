@@ -2017,3 +2017,17 @@ before, 1.5-4.5 after). The snap threshold is now 20 m (real teleports), and
 
 Also kept: writing the position to +0xC0, +0x100 and +0x120 (the capsule
 centre).
+
+## 2026-10-22, twentieth session: map peer movement to the puppet's own states
+
+Diagnosis of the "teleporting" look: the position moves, but the body slides in
+an idle pose. The peer's state names ("groundMovement", "freeAim", "strafe")
+do not exist in the crew recruit's action state table, so the name lookup
+found nothing and the puppet stayed in "Idle" while its position moved.
+
+v59 maps the peer's movement to states the puppet actually has: speed is
+computed from the last two received positions (the history buffer from v58);
+above 0.8 m/s the action SM is forced to "Ped", below it to "Idle". Those are
+states of the NPC's own action table (measured with `smnames`: Idle = 5,
+Ped = 6, Follow = 24, FireGunStationaryAction = 12, StrafeFire = 13), so the
+body plays its own walking animation instead of sliding.

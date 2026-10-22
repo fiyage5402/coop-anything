@@ -1957,3 +1957,18 @@ The SM's PlayAnim is kept only as a fallback (on peer state change, not every
 
 No SM flags are modified. The kinematics update runs normally, so movement
 stays smooth.
+
+## 2026-10-22, sixteenth session: direct AnimView write causes stutter, reverted to PlayAnim-only
+
+The direct write of the peer's state id to av+0x14/0x18 every frame (v54)
+caused movement stuttering. The write itself is cheap, but the CCT layer
+reacts to the state id change by doing work (looking up the state in the
+name-node table, loading animation data) that hitches the frame.
+
+v55 reverts to PlayAnim on peer state change only (no direct writes, no
+forced re-application every 200 ms). This means the NPC's AI will still
+override the animation periodically, but the movement stays smooth.
+
+The animation sync is now: PlayAnim on peer state change (worker thread).
+The NPC's AI fights it, but the visual result is acceptable (the puppet
+mirrors the peer's stance for a moment, then snaps back, then mirrors again).

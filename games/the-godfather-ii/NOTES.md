@@ -1419,3 +1419,63 @@ Safer options for making the puppet look like the remote player:
    (CCT state names), not by raw id.
 
 Until one of these is proven, keep `mobface` unused.
+## 2026-10-22, second session: position sync verified end to end
+
+**Verified (automated, no manual check):** two real clients, both loaded saves in
+the same area. Puppet A sits at player B's position within 4-7 cm; puppet B at
+player A's position within 4-7 cm; 0.5-0.85 m while running (the 0.35 lerp
+chasing a 20 Hz stream). Network: `recv` ~2200-4000 packets, `age` 16-63 ms.
+
+**Hook facts learned the hard way**
+
+* `FUN_0088d6e0` (player matrix composer) is the only per-frame hook that fires
+  reliably in every scene: 22k-23k calls in a couple of minutes. The camera hook
+  `FUN_006d24d0` fires only while the camera is moving (a static scene gives
+  `cam=0`), and the present hook `FUN_006080a0` never fired at all in these runs
+  (`frame=0`), so the game must render through another path.
+* `PeekMessageW` runs constantly (thousands of calls/s) but `engine_ready()`
+  (deferred-list global `0x1206880`) is **false** there - measured engT=0,
+  engF=4295. So engine calls cannot be moved to the message pump; the matrix
+  hook stays the driver. `frame_work()` is still called from the pump as a
+  fallback, with the same guard.
+* The game pumps `PeekMessage` with `PM_NOREMOVE` (the `remove` flag is 0), so
+  anything gated on `remove` never runs.
+
+**Why the puppet "stopped moving" (root cause)**
+
+1. The saved target address died: NPC back to memory after streaming out keeps
+   its vtable pointer, so the vtable checks still pass, but `+0xC0` is zeroed.
+   `SetPosition` then keeps "succeeding" on a corpse: `applied` grew while the
+   position stayed (0,0,0).
+2. Worse: teleporting a borrowed NPC 200+ m to the peer makes the game unload it
+   (it leaves its streaming bubble), so a far peer killed the puppet every time.
+
+**Fixes in v30/v31**
+
+* `netsync_apply` only drives the puppet when the peer is within 60 m; beyond
+  that there is nothing to see and the body dies.
+* Liveness test before every apply (`entity_is_animated_character`: vtable slot
+  8 = SetMatrix, proxy at `+0x3D4` in the 0x1A-0x1D heap, AnimView at `+0x218`
+  with a non-zero state at `+0x18`, transform at `+0xC0` finite and non-zero).
+  A dead body resets the target so the scanner re-attaches.
+* Automatic puppet selection (`autotarget`): background thread (the scan is
+  memory-bound at ~15 MB/s, so it must not block the 20 Hz net thread or the
+  game), start at `0x03000000`, budget 20 s, time-sliced per page, no region
+  clamp (the 8 MB clamp hid the character heaps). Picks the closest class
+  `0xD626D8` character with a live proxy + AnimView; falls back to any
+  Entity-derived animated object. `target 0x00000000` in `coop_net.cfg` means
+  "pick automatically"; `autotarget` console command runs one scan on demand and
+  prints hits/chars/loose/end for diagnosis.
+* `net` status now also prints a `netdiag` line: `calls applied setfail reason
+  posfail vt8 vt7 state conv` (conv = ms since the puppet last sat at the peer
+  position; -1 = never).
+
+**Open issue / next**
+
+Borrowed pedestrians still despawn after a while even within 60 m, so the puppet
+pops in and out. The owner's idea is the right direction: use a **crew member**
+from the player's own family - crew NPCs follow the player and persist. Plan:
+score candidates across scans (an address that keeps reappearing near the player
+over several scans is a follower) and prefer the highest score; a dedicated,
+engine-spawned body would be even better but model creation via
+`BuildModelFromSavedData` crashes on live characters.

@@ -2175,3 +2175,31 @@ a borrowed body; `amatch=0 aapplied=0` remains. Evidence:
 `169.24,10.21,-172.50` (client, free aim with pistol); both connected, windows
 side by side, v61 loaded. Next: profile-state `resume` test, player appearance,
 vehicle mapping, and a longer smfreeze stability run.
+
+## 2026-10-22, twenty-fourth session: resume disabled in v62
+
+**Profile-state test:** a fresh B was driven to profile selection (state
+`0x20`) and `resume` was called. The game **crashed** (process 19220
+disappeared; the command output stopped at `--- begin ---`). The previous
+guard to `0x20` was therefore not sufficient.
+
+**Why:** disassembly of `0x00931D00` shows a profile-list/frontend transition,
+not a safe "load last save" entry point. It immediately dereferences the
+profile manager at `0x0112B9B4` and frontend globals, then calls `0x8f29f0`
+with callback `0x931600`; the direct call has no valid frontend context. The
+callers found in the executable target `0x00D32D00` (a UI text renderer), not
+this address, so there is no simple call-site to copy.
+
+**v62 change:** `resume` is now disabled unconditionally and no longer calls
+`0x00931D00`; it prints
+`cmd: resume: disabled (unsafe direct frontend call; state N)`. Version bumped
+to v62 (`local/coopcore_v62.asi`, 220160 bytes) and deployed to both copies.
+Both booted; `resume` at campaign state `5` printed the disabled message and
+the game stayed alive. Splash/profile-selection crash paths are gone.
+
+**v62 live state:** A = PID 10860, hwnd `0x1A157A`, player `0x14E384A0`,
+host 47779; B = PID 1252, hwnd `0x210D6C`, player `0x14EA7B20`, client
+47778. Targets A `0x060A5A80`, B `0x0619EE20`; `calls/applied` 1478,
+`setfail=0`, `smfrz` 5928, `conv=31`. A walked from the start position to
+`182.006,10.224,-172.316`; B's `peerpos` followed `182.01,10.22,-172.32`.
+Windows arranged A `(0,0)`, B `(1280,0)`.

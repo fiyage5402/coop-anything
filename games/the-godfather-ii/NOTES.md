@@ -1938,3 +1938,22 @@ while keeping EVAL_CHECKTRANS (4) cleared on all three. The root SM still runs
 its update messages (kinematics), but the action SM no longer sends animation
 changes. This is the Jericho pattern: stop the body's own AI from touching the
 animation, keep the movement physics alive.
+
+## 2026-10-22, fifteenth session: write the peer state into the CCT AnimView every frame
+
+v53's EVAL flags approach (clearing transitions, suppressing update messages on
+the action SM) still didn't stop the NPC's own animation from reappearing.
+The owner confirmed: "movement is stuttery, the game tries to return the NPC
+pose."
+
+v54 takes a completely different approach: instead of fighting the SM, write the
+peer's CCT state id directly into the puppet's AnimView (av+0x14 and av+0x18)
+every frame in the frame hook, after the SM's update. The SM overwrites it
+next frame, but we overwrite it again. The secondary action states (weapon aim/
+shoot) are written to the secondary chain (av+0x124 → +0x18).
+
+The SM's PlayAnim is kept only as a fallback (on peer state change, not every
+200 ms), since the direct write is cheaper and doesn't trigger SM transitions.
+
+No SM flags are modified. The kinematics update runs normally, so movement
+stays smooth.

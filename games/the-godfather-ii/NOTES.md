@@ -2390,3 +2390,12 @@ not arrest A, unlike the earlier white/police car.
 black limo at `172.02,10.18,-217.29`; B = PID 24808, player `0x14E68520`,
 client 47778, at the mansion start with the map open. `veh=9`,
 `vclass=0x00D759AC`, `vapplied=2876`, `setfail=0`, `smfrz` 382k. Both v70.
+
+**Vehicle soak (~3 min):** A stayed in the black limo; B remained on the map
+screen. `veh=9`, `vclass=0x00D759AC`, `fl=1`, `vapplied` climbed
+3419 -> 3906 -> 4399 -> 4889, `setfail=0`, no crash. A at
+`172.18,10.18,-217.28`; B's `peerpos` `172.23,10.18,-217.27`. This confirms
+the vehicle apply path is stable while the peer sits in the car. The actor
+scan is slow but did find 9 cars; `vehadd` remains the quick way to register a
+known car. The safe location is the Corleone Mansion driveway; the black
+family limo does not trigger an arrest.

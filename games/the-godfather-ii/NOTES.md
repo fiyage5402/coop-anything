@@ -1982,3 +1982,21 @@ v56 sets EVAL_BUSY (1) on the puppet's root SM and both child SMs, which makes
 the state machine consider itself busy and skip its update. This is the
 closest equivalent to Jericho's `oAI.bEnable = false`. If it freezes the
 puppet or crashes, revert to v55.
+
+## 2026-10-22, eighteenth session: three position copies
+
+Measured on the live puppet: the position exists in three places in the
+entity:
+
+* `+0xC0` - the entity matrix translation (what entity_setpos writes)
+* `+0x100` - an exact duplicate of it
+* `+0x120` - the character proxy's capsule centre, about 1.0 higher in Y
+
+Writing only `+0xC0` lets the engine's kinematics update snap the body back to
+the proxy position, which the owner described as "teleporting". v57 writes the
+peer's position to all three: `+0xC0`, `+0x100`, and `+0x120` (with the
+measured +1.0 Y offset for the capsule centre).
+
+The AI-flag experiments (EVAL_NOUPDATEMESSAGES, EVAL_CHECKTRANS, EVAL_BUSY)
+were all reverted: none of them stopped the animation from reverting, and
+several broke movement.

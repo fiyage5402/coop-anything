@@ -1972,3 +1972,13 @@ override the animation periodically, but the movement stays smooth.
 The animation sync is now: PlayAnim on peer state change (worker thread).
 The NPC's AI fights it, but the visual result is acceptable (the puppet
 mirrors the peer's stance for a moment, then snaps back, then mirrors again).
+
+## 2026-10-22, seventeenth session: EVAL_BUSY to pause the puppet's SM
+
+v55 (PlayAnim only) still had stuttery movement and the animation kept
+reverting, because the NPC's AI was still running and fighting us.
+
+v56 sets EVAL_BUSY (1) on the puppet's root SM and both child SMs, which makes
+the state machine consider itself busy and skip its update. This is the
+closest equivalent to Jericho's `oAI.bEnable = false`. If it freezes the
+puppet or crashes, revert to v55.

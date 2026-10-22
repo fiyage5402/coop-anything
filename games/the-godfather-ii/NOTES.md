@@ -1879,3 +1879,24 @@ sdbm -t 46F5C7B4 idle idle_loop     -> idle 0x46F5C7B4  <== MATCH
 
 Note: PowerShell cannot be used for this, its 32 bit arithmetic overflows
 into a negative int64; the C tool is the reliable one.
+
+## 2026-10-22, eleventh session: animation transfer works, but it cost frames
+
+The owner confirmed that the animation sync visibly improved (the crew recruit
+now mirrors the peer's stance), but the game stuttered badly.
+
+Cause: `PlayAnim` and the state machine force were both called **inside the
+frame hook**, i.e. on the main thread. Both are real engine work (state change,
+clip setup, spawning child state machines), so every call cost frames - the
+same lesson as with `ForceModelRebuild`.
+
+v50 moves both off the game thread: the frame hook only posts a request
+(`anim_post`), a dedicated worker executes it. Also:
+
+* the peer's state names are read at 5 Hz instead of 20 Hz;
+* the corrective force runs every 250 ms instead of 200 ms;
+* the state table search is limited to 512 entries (the tables are packed
+  blocks, the old loop read 4096 entries with a `VirtualQuery` each).
+
+Measured CPU while both clients run: host 57%, client 73% of one core (the
+game itself is the bulk of it).

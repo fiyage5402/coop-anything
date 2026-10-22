@@ -1505,3 +1505,84 @@ the handful of gameplay states by name and translate ids per body.
 **Note**: one client (A) exited once during this session with a normal-looking
 log tail and no plugin error - no evidence it was the mod, but a crash handler
 that logs the exception address would settle it.
+
+## 2026-10-22, fourth session: model / animation layer, what works and what does not
+
+### Part strings of a Sentient (verified in the live process)
+
+`Sentient` derives from `PartedAnimated` (SDK), and the four `String` fields sit
+exactly where the SDK says: `+0x2B0` preset, `+0x2C0` theme, `+0x2D0` swap set,
+`+0x2E0` assembly, `+0x2F0` PresetInstance pointer. A `String` in this build is
+16 bytes: `{ char* data; u32 size; u32 capacity; u32 tag }`; `capacity == size`
+for engine-written names, and the tag is `0x004D38D0` for every non-empty
+string (0 for empty ones).
+
+Measured values:
+
+* Player: preset `mobface`, theme ``, swap set ``, assembly `player`.
+* Crew NPC (the auto-selected puppet): preset/theme `corleonerecruit_0001_v3`,
+  swap set `queens`, assembly `player`.
+
+So the assembly is `player` for every human; only the preset differs. The
+auto-target + crew scoring picks real Corleone recruits, i.e. the owner's "use a
+crew member" idea already happens by itself.
+
+### Rebuilding a model: the call must not run inside a game frame
+
+`PartedAnimated::ForceModelRebuild` = `0x09C58C0` (thiscall, `(PresetInstance*,
+const char* name)`). Called from the frame hook (console command), it **hangs
+the main thread**: the game froze and then exited (measured, A client). The same
+call from a plain worker thread returns immediately and the game keeps running
+(measured on both clients), so the rebuild waits on streaming that only proceeds
+when the main thread is free. `coopcore` now runs every model call on a worker
+thread (`swap_thread`, modes: wear-player-model, mobface slot, plain rebuild).
+
+`ForceModelRebuild` also assigns the new name into the object's own
+`m_PartsPresetName` (the engine reallocated the buffer to `capacity == size` of
+the new name) - writing that string by hand is not needed.
+
+### "Wear the player's body" does not work on an NPC
+
+Calling `ForceModelRebuild(puppet, NULL, "mobface")` (or
+`MobfaceManager::BuildModelFromSavedData(PLAYER, puppet)`, `0x09BF2F0`) gives a
+**partial model**: the head changes (face, hair, glasses appear) and the
+animation state id becomes the player's own (`0x46F5C7B4` - i.e. the animation
+layer would match), but the torso, arms and shoes stay invisible. Tried
+combinations: theme `corleoneassociate_0023_main` restores a black torso but the
+trousers stay white; clearing theme and swap set (player values) makes the torso
+disappear again. Conclusion: the player's body parts (shirt, arms, shoes) come
+from the apparel system tied to the player/family-tree slot and are not built
+for a borrowed NPC by either function. A real "second player" look needs the
+peer's mobface/apparel data transferred over the network, not a preset name.
+
+Useful side effect: with the player model the puppet's AnimView state matched
+the peer's packet id exactly, which confirms the animation ids are per-model and
+that model identity is the gate for animation sync.
+
+### MobfaceManager save bits (read from the live game)
+
+`MobfaceManager* = *(void**)0x11298A0`; at `+0x40`: version `1`,
+`m_EditedInMobFace = 0`, `m_EditedInApparel = 1`. Bit 0 corresponds to the
+player slot (the only one with saved apparel in this save), so
+`BuildModelFromSavedData` has data for the player and nothing for family slots.
+
+### Both test clients run the same save
+
+The two test copies have byte-identical profiles (`profiles.dat`, autosave and
+manual save all share hashes), so both clients load the same world. That makes
+actor-level world sync meaningful: the same NPCs exist on both sides, at the
+same absolute coordinates, at least until their local AI diverges.
+
+### New console commands (v34)
+
+* `setsuit [obj]` - rebuild the object with the player's preset (worker thread).
+* `mobface [obj] [slot]` - `BuildModelFromSavedData` (slot `0xFFFFFFFF` = player).
+* `rebuild [obj]` - `ForceModelRebuild` from the object's current part strings.
+* `setparts [obj] preset theme swapset assembly` - write the part strings in
+  place (capacity-checked; `.` clears, `-` leaves alone) and rebuild.
+* `partnames [obj]` - print preset / theme / swap set / assembly.
+
+Arbitrary 32-bit values can be written from the console with `writef`: pass the
+decimal form of the float whose bit pattern is the value (denormals included,
+e.g. `1.121039E-44` writes `0x00000008`) - used to write string sizes and ASCII
+while testing.

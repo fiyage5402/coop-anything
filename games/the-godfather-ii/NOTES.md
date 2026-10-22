@@ -2000,3 +2000,20 @@ measured +1.0 Y offset for the capsule centre).
 The AI-flag experiments (EVAL_NOUPDATEMESSAGES, EVAL_CHECKTRANS, EVAL_BUSY)
 were all reverted: none of them stopped the animation from reverting, and
 several broke movement.
+
+## 2026-10-22, nineteenth session: snapshot interpolation (Jericho pattern)
+
+v57's three position copies didn't fix the stutter. The jerkiness comes from
+the position filter, not from the AI: the puppet lerped 35 % toward the newest
+20 Hz state every frame, so every packet timing wobble became a visible jump,
+and a distance over 5 m snapped the body outright.
+
+v58 buffers the received states (32 entries, ~1.6 s) and draws the body a
+little in the past, interpolating between the two states around
+`now - 100 ms`, with 200 ms of velocity extrapolation when states stop. This is
+exactly what Jericho Co-op does (their notes: 107-201 visible jumps a minute
+before, 1.5-4.5 after). The snap threshold is now 20 m (real teleports), and
+`snaps=` in the diagnostics counts them.
+
+Also kept: writing the position to +0xC0, +0x100 and +0x120 (the capsule
+centre).

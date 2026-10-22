@@ -1848,3 +1848,34 @@ v48 therefore:
   secondary action states of the weapon chain);
 * keeps the name based path as a fallback and counts both in the diagnostics
   (`anim=` and `smstate=` in `netdiag`).
+
+### Why the puppet ignored the state even with the right id
+
+`PlayAnim` does take a CCT state id: the SDK's NPC inspector plays animations
+with `PlayerSM->PlayAnim(Character_GetStateName(...), true, true, false, 1.0f,
+true)`, that is with exactly the id space the plugin reads from
+`AnimView+0x18`. The call itself works (`anim=` counter rises), but the crew
+recruit runs its own AI: its state machine puts the body back into its own
+state every frame, so a one-shot `PlayAnim` is overwritten immediately. The
+puppet's root state id stayed at its own value (`0x05485E39`) while the peer's
+(`0x1193FB8B`) arrived correctly over the wire.
+
+v49 therefore forces the peer's state back whenever the puppet's current state
+differs from it, at most every 200 ms (`animforce=` in the diagnostics).
+
+The state names of the state machine tree are readable after all
+(`start|main|idle|noTarget|search|groundMovement|...`), so the name based
+path works as well (`smstate=` counter) - it drives the state machine, the id
+based path drives the animation.
+
+### Tool: local/sdbm.c
+
+`local/sdbm.c` prints the SDBM hash of a name, which is the engine's id
+function for state and state table names:
+
+```
+sdbm -t 46F5C7B4 idle idle_loop     -> idle 0x46F5C7B4  <== MATCH
+```
+
+Note: PowerShell cannot be used for this, its 32 bit arithmetic overflows
+into a negative int64; the C tool is the reliable one.

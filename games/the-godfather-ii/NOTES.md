@@ -1365,3 +1365,36 @@ The SDK's module tree gives the actor/NPC plumbing for layer 3:
 Start there for a cheap way to enumerate the actors near the player (instead of
 scanning the heap), then mirror the host's list on the client by moving its
 nearest spare Sentients (a rough actor mirror) or by spawning proper NPCs.
+### Video review + model swap (v20)
+
+The owner recorded a 41 s 2560x1440 video of both windows. Frames (extracted
+with Topaz's bundled ffmpeg, no install needed) show the puppet standing at the
+other player's spot in both windows and both players aiming pistols - the
+position/yaw sync is visibly correct. The aim pose is not reproduced on the
+puppet.
+
+Network log while aiming:
+
+    A sees B: anim=0x1193FB8B (idle)   sec=-1,-1
+    B sees A: anim=0x15D2906B (aim)    sec=-1,-1
+
+So aiming changes the **primary** state id, and the secondary slots stay empty
+(it is a stance, not an action). The primary id only animates correctly on the
+same character model - the ids are model-dependent, which is why forcing the
+player's walk/idle ids on a crew NPC stuck or failed.
+
+**Model swap found in the SDK:**
+
+    MobfaceManager::GetInstance()               = *(void**)0x11298A0
+    MobfaceManager::BuildModelFromSavedData     = 0x09BF2F0
+    FamilyTreeSlot: PLAYER = 0xFFFFFFFF, SOLDIER1..4 = 0..3
+
+`BuildModelFromSavedData(slot, sentient)` is the function behind the NPC
+inspector's "Load Mobface" button. Calling it with the PLAYER slot on the puppet
+should give the puppet the protagonist's appearance, after which the animation
+ids match and the primary state can be applied.
+
+v20 (local/coopcore.c) adds the console command `mobface <obj> [slot]`
+(default slot = player) and re-enables the primary anim application (it is
+applied only when the peer's id changes). Next test: apply `mobface` to the
+puppet in each client, then walk/aim/shoot and compare.

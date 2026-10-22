@@ -2073,3 +2073,43 @@ contains the scan-code keyboard, relative-mouse and Alt+Tab focus helpers.
 
 Next: deploy v60 to both copies, repeat the boot sequence, and test `resume`,
 `smfrz`/`smfreeze`, `net lerp` and `net reopen` against the working baseline.
+
+## 2026-10-22, twenty-second session: v60 deployed, smfreeze and walk sync verified
+
+**Deployed:** `local/coopcore_v60.asi` (220160 bytes, v60 string) to both
+`scripts\coopcore.asi`; the previous v51 is saved as
+`local/coopcore_v51_backup.asi`. Both clients now log `coopcore.asi v60 loaded`.
+
+**Autonomous boot:** `local/boot_client.py A|B [pid]` drives a fresh client from
+the splash to the campaign in four probe steps: state `6` (movie) ->
+`Enter, Esc, Enter, click` -> `0x24` (autosave) -> `Enter` -> `0x11` (save
+list) -> `Enter` -> state `5` with a non-null player. Both clients loaded the
+same save; A player `0x14ED8420`, B player `0x14D37B20`.
+
+**`resume` is a crash, not a shortcut.** Calling it from the splash state `7`
+(`0x00931D00` / `GamePersistence::Restore`) killed A (PID 23732 disappeared,
+the command output stopped at `cmd: --- begin ---`). Do not use it at the
+splash; guard it to the main-menu/profile states before shipping. The manual
+boot script above is reliable.
+
+**v60 commands:** `net` prints the `netdiag` line as well; a standalone
+`netdiag` command is unknown. `net lerp 0.350` returned
+`cmd: net lerp 0.350`. `net reopen` on B returned
+`cmd: net reopen -> 1 (port 47778)` and the session reconnected (`state=1`,
+`peerpos` updating, `conv=15`).
+
+**smfreeze verified:** `smfrz` counters reached 76k+ on both sides. While A
+held `W`, B's puppet action SM showed `idx=6 name='Ped'` (not `Idle`), and
+while B held `W`, A's puppet action SM also showed `Ped`. Visual proof:
+`local/dual_v60_puppet_walk1.png` (B sees A's dark-suited body walking) and
+`local/dual_v60_A_sees_B_walk.png` (A sees B's body walking). The remote body
+is a borrowed NPC in a dark suit, not the player's red-shirted model.
+
+**Bidirectional position sync:** A walked from `182.0` to `170.68`; B's
+`peerpos` followed with `calls/applied` increasing, `setfail=0`, `conv` 15-16.
+B teleported to `166.0` and walked to `165.7`; A's `peerpos` followed. `snaps=0`
+for normal walking. `amatch=0 aapplied=0` remains: the visible walk comes from
+the forced `Ped` state, not from CCT animation matching.
+
+Still open: `resume` guard, player-model appearance on the borrowed body,
+combat/vehicle state mapping, and a long-run stability check with smfreeze.

@@ -2361,3 +2361,32 @@ observed in game.
 **Live state:** A = PID 9212, player `0x14E17B20`, host 47779, pos
 `168.06,10.22,-177.47`; B = PID 10672, player `0x14D37B20`, client 47778,
 pos `185.94,10.22,-172.73`. Both v68, connected.
+
+## 2026-10-22, thirtieth session: vehicle sync verified at the Corleone mansion
+
+**Location:** the safe car spot the owner pointed at is the **Corleone Mansion
+driveway/courtyard**, world position about `171.1,10.27,-215.3`; the black
+family limousine there is enterable (E prompt) and does not trigger an arrest.
+Class vtable `0x00D759AC`. The in-game map labels the area
+`Нью-Йорк / Дом Корлеоне`.
+
+**Root cause of the missing car motion:** vehicles keep their world transform
+at **`+0x78` / `+0xB8` / `+0xD8`**, not at `+0xC0` (+0xC0 is a local/part
+position). v69/v70 added `vehicle_getpos`/`vehicle_setpos` and switched
+`veh_note`, `peer_vehicle_apply`, `vehscan` and `vehlist` to them; v70 also
+added the `vehadd`/`vehlist` diagnostics.
+
+**Verified:** A entered the black limo; B received `fl=1`,
+`vclass=0x00D759AC`, and `state='...|vehicle|updateVehicle'`. B's
+`veh=9`, `vapplied=2876` (increasing), and `vehlist` showed B's car
+`0x06178418` at `172.02,10.18,-217.29` - matching A's peer position
+`172.017,10.179,-217.290`. The car is therefore being moved on the client side
+to the peer's vehicle position. Evidence: `local/dual_v70_car_sync.png`
+(A inside the black limo; B has the map open). The actor scan is slow; a
+`vehadd <addr>` can register a known car immediately. The black limo test did
+not arrest A, unlike the earlier white/police car.
+
+**Live state:** A = PID 23992, player `0x14EC84A0`, host 47779, inside the
+black limo at `172.02,10.18,-217.29`; B = PID 24808, player `0x14E68520`,
+client 47778, at the mansion start with the map open. `veh=9`,
+`vclass=0x00D759AC`, `vapplied=2876`, `setfail=0`, `smfrz` 382k. Both v70.

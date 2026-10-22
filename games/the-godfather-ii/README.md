@@ -5,28 +5,33 @@
 | Engine | Visceral Engine (per PCGamingWiki; not confirmed from the binary) |
 | Versions tested | `1.0.789.0` as shipped inside the SE v0.56 Nexus mod bundle - an **unverified third-party executable**, not a build to follow: run only in a disposable copy. Boots to the campaign there, menu and gameplay confirmed. Clean retail `1.0.764.0` inspected statically only |
 | Projects | Multiplayer Revival (match multiplayer, not campaign) <https://www.nexusmods.com/thegodfather2/mods/95>; The Godfather II SE script extender (modding hook, not co-op) <https://www.nexusmods.com/thegodfather2/mods/40>; VisceralToolkit (asset/stream tooling, WIP) <https://github.com/Greavesy1899/VisceralToolkit> |
-| QA level | none (no automated assertion suite yet; a repeatable manual boot path and the tooling to build one are in place) |
-| Last updated | 2026-10-21 |
+| QA level | automated for the sync layer (scripted two-client checks of position, animation state and stability; no campaign playthrough, no public release) |
+| Last updated | 2026-10-22 |
 
 ## Where things stand
 
-Still no campaign co-op project exists for this game, and none was found in the
-public sources. What changed in this round of work is the ground under such a
-project: the game is now **runnable and observable** in an isolated copy, and a
-small own-code plugin loads inside it through the SE extender's ASI loader, which
-gives a co-op mod a supported place to hook.
+There is still **no public campaign co-op project** for this game. What exists
+now is a working two-client prototype: an own-code ASI plugin that makes the
+second player's character appear in the first player's world, on two copies of
+the game running on one PC over UDP loopback.
 
-Concretely: the `1.0.789.0` executable bundled with SE v0.56 (again: an
-unverified third-party exe, usable only as a disposable test target) starts from
-a disposable copy, reaches the main menu, loads an existing campaign profile and
-**drops straight into the campaign - no Cuba intro** - and runs the mission
-gameplay with HUD, NPCs and the world map. The player's world transform is read
-from the engine at 5 Hz by our own plugin, and character objects and their
-transform rows can be located in the live process with an external inspector.
-The single open end is the authoritative transform slot of a second character,
-which is what a "player 2" puppet would have to write.
+Measured on the prototype (both clients are real game clients with the save
+loaded, positions read from inside the game):
 
-Research log with every address, crash cause and dead end: [NOTES.md](NOTES.md).
+| what | result |
+|---|---|
+| puppet position vs. peer position | **0.00 m** (exact, measured repeatedly) |
+| heading | follows the peer's yaw |
+| animation state | the peer's CCT state id is transferred and re-applied; the owner's report: the puppet visibly mirrors the peer's stance |
+| automatic puppet pick | a real crew recruit near the player, with dead or streamed-out bodies replaced |
+| vehicle flag and vehicle class | both arrive at the other client |
+| round trip | 15-16 ms |
+| frame rate | 149 fps in the focused window, no plugin-induced stutter after the animation work was moved off the game thread |
+| crashes | none caused by the plugin since the instrumentation was added |
+
+Research log with every address, measurement, crash cause and dead end:
+[NOTES.md](NOTES.md). The plugin source is not public yet.
+
 
 ## Existing work
 
@@ -81,19 +86,27 @@ Research log with every address, crash cause and dead end: [NOTES.md](NOTES.md).
 
 ## What we changed
 
-Nothing in any installation, and nothing published. Inside a **disposable copy**
+Nothing in any installation, and nothing published. Inside **disposable copies**
 only:
 
 - three byte patches in the copy's `godfather2.exe` (each recorded in the private
   identity notes): the under-spec capability gate, the `Window.Fullscreen`
   default, and the GPU-vendor detector that dereferences a NULL `strstr` result;
-- our own ASI plugin (`scripts\coopcore.asi`, own code) with five engine hooks, a
-  5 Hz player-state log, a path redirect that keeps the machine's real EA Games
-  profile untouched, a puppet writer and a vectored exception handler as a
-  safety net;
+- our own ASI plugin (`scripts\coopcore.asi`, own code) with five engine hooks
+  and these subsystems:
+  - **networking**: UDP loopback, 20 Hz position packets, one packet carrying
+    position, heading, the animation state id, the two secondary action state
+    ids, the "in a vehicle" flag, the peer's vehicle class and the peer's state
+    machine names;
+  - **puppet**: automatic pick of a live crew recruit near the player, with
+    dead or streamed-out bodies replaced, position and heading driven every
+    frame, animation state re-applied when the NPC's own AI overrides it;
+  - **diagnostics**: a file-driven console (`coop_cmd.txt` -> `coopcore_cmd.txt`)
+    with live counters for every apply path, plus crash and access-violation
+    handlers;
 - own tooling: an external inspector/writer for the running game, a position
-  finder, a container dumper, an input/screenshot driver, an exe byte patcher and
-  a D3D9 environment probe.
+  finder, a container dumper, an input/screenshot driver, an exe byte patcher,
+  a D3D9 environment probe and an SDBM name hash tool.
 
 The machine's pre-existing profile, settings and campaign saves were verified
 byte-identical against a pre-work backup, and the original installation's
@@ -101,55 +114,76 @@ executable hash is unchanged.
 
 ## QA
 
-No automated assertions yet. What exists is a repeatable procedure and the
-tooling to automate it:
+Two real game clients, both loading the same campaign save in disposable
+copies, are driven by scripts that read the state from inside each process.
+What the scripts check:
 
-1. launch the disposable copy on the host; the plugin redirects the profile
-   paths into the copy, so the real ones are never written;
-2. menu path: any key on the splash -> select the existing profile with a real
-   mouse click -> resume the saved game -> a mission; the campaign loads directly,
-   no intro;
-3. `coopcore_player.txt` next to the executable then shows the live player
-   position, and the external inspector can dump and compare engine objects.
+1. both clients are up and the UDP link is up (`net`: sent/recv counters grow,
+   peer age stays small);
+2. the puppet sits on the peer (`conv` in `netdiag` = ms since the puppet was
+   last measured within 2 m of the peer; the position difference was 0.00 m in
+   the runs recorded in NOTES.md);
+3. the animation state id arrives and is re-applied (`anim`, `animforce` in
+   `netdiag`);
+4. the peer state names arrive (`state='...'` in the `net` line);
+5. no plugin crash (`crash:` and `vehx:` lines stay empty in the log).
 
-The same boot was reproduced in Windows Sandbox (vGPU, networking disabled),
-which is where the display-mode limitations were measured. Note that synthetic
-mouse input does not reach the game's UI there (the engine reads the pointer
-through Raw Input), which is why the host is the faster lane for iteration.
+There is **no** scripted menu path (the game reads the mouse through Raw
+Input, so the profile screen needs a real click) and **no** campaign
+playthrough in co-op yet, so the QA level is "automated for the sync layer"
+only.
 
 ## How to play
 
-Nothing to play: there is no co-op release. The internal test procedure is the
-menu path above.
+Nothing to play: there is no co-op release. The internal test procedure is:
+
+1. start both disposable copies (the plugin redirects the profile paths into
+   the copy, so the real profile is never written);
+2. in each copy: load the campaign profile and resume the save (a real mouse
+   click for the profile screen);
+3. the plugin connects over UDP loopback and each client picks up a puppet for
+   the other one automatically;
+4. `coop_cmd.txt` next to the executable accepts `status`, `net`, `netdiag`,
+   `sm`, `smnames`, `findsm`, `partnames`, `puppet` and more, and answers in
+   `coopcore_cmd.txt`.
 
 ## Known issues
 
+- **The peer's car cannot be shown.** Vehicles are simulated per client: the
+  car the host sits in does not exist in the client's world at all (measured:
+  the client receives the vehicle class but no object of that class exists near
+  the peer). The packet carries the class and the client side is written, but
+  there is nothing to attach to; showing it needs a car to be created in the
+  client world.
+- **The puppet looks like a crew recruit, not like the protagonist.** Giving
+  an NPC the player's saved appearance crashed the game
+  (`BuildModelFromSavedData` on a live character jumps through a corrupted
+  pointer), and forcing the player model without the saved apparel data yields
+  a head without a body.
+- **Ambient NPCs are not synchronised.** Pinning the positions of world NPCs
+  crashed through a corrupted pointer and made the NPC scheduler spawn
+  replacements, so the layer is off by default (`actors 0` in the config).
+- **The NPC's own AI fights the animation state.** It puts the body back into
+  its own state every frame, so the peer's state has to be forced back
+  repeatedly; the result is right most of the time but not frame perfect.
 - Build identity is a moving target: the clean copy reports `1.0.764.0` while
   both the Multiplayer Revival archive and the SE extender bundle their own
   different `godfather2.exe` builds. Any patching must be re-derived per build -
   every address in the notes belongs to the SE `1.0.789.0` build only.
 - The game's UI takes the mouse through Raw Input; keyboard navigation works in
   the menus, but the profile screen needs a real click.
-- The engine's own in-game mouse handling is unchanged by our hooks, so a
-  scripted test bot cannot drive the character with synthetic keys yet.
 
 ## Next steps
 
-1. Build the co-op plugin on the documented engine SDK. The authoritative
-   character transform is the Havok character proxy at `sentient+0x3C0` - the
-   same `ADD ECX,0x3C0` our very first position-getter disassembly showed - and
-   `SimNPC` keeps a mirror in its first member `RwV3d m_CurrentPosition`.
-   The engine's own move function is `Player::Teleport` at `0x0079E3C0`
-   (`Player::GetLocalPlayer()` resolves through `PlayerManager::GetPlayer(0)`
-   minus `0x7CC`). For an NPC the route is its state machine
-   (`seektopositionsm`, `npcfollowsm`, `crewcommandsm`).
-2. Drive a second character from the player's position with those calls - the
-   first visible "player 2" puppet - instead of poking memory.
-3. Data-only alternative: `.sgp` files are raw `SimGroupTOC` images that the SE
-   merges into a loaded SimGroup, so behaviours can be injected without any
-   process access.
+1. Decide what to do with the vehicle: create a car in the client world and
+   drive it to the peer, or drop the feature and document it as a limit.
+2. Give the puppet the protagonist's appearance without touching the live
+   character's model (copy the saved mobface and apparel data instead of
+   rebuilding the model in place).
+3. Sync the world, not just the peer: the ambient layer needs stable entity
+   identity (a GUID per NPC) and a crash-free way to move world characters.
 4. Turn the manual boot path into an automated one (script the menu with
    injected keys, add a watchdog that asserts the campaign map is reached).
-4. Then pick the co-op hook and the networking model per
-   `playbook/how-coop-mods-work.md` and
-   `playbook/networking-steam-spacewar.md`.
+5. Then pick the networking model per `playbook/networking-steam-spacewar.md`
+   for players outside the same machine.
+

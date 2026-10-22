@@ -2113,3 +2113,65 @@ the forced `Ped` state, not from CCT animation matching.
 
 Still open: `resume` guard, player-model appearance on the borrowed body,
 combat/vehicle state mapping, and a long-run stability check with smfreeze.
+
+## 2026-10-22, twenty-third session: v61 combat mapping, resume guard, walk sync
+
+**v61 source changes** (`local/coopcore.c`, built as `local/coopcore_v61.asi`,
+221184 bytes): the peer's state names now drive the borrowed body's action SM
+for combat/weapons as well as movement: `h2h`/`QuickAttack`/`Melee` ->
+`MeleeAttack`; `Fire`/`Aim` -> `FireGunStationaryAction`; `DrawGun` ->
+`DrawGunAction`; `Reload` -> `ReloadGunAction`. The speed-based `Ped`/`Idle`
+fallback remains. `resume` is now guarded: it refuses unless the frontend state
+is `0x20` (profile selection), instead of calling `0x00931D00` at the splash.
+
+**Deployed and booted:** both copies run v61 (`coopcore.asi v61 loaded`); A =
+PID 23892, hwnd `0x400928`, player `0x14F57B20`; B = PID 23528, hwnd
+`0x370D18`, player `0x14E37B20`. A is host on 47779, B client on 47778.
+
+**`resume` guard verified:** in campaign state `5`, B printed
+`resume: frontend state 5, refusing (needs profile selection 0x20)` and stayed
+alive. The old splash crash path is now gated; it still needs a profile-state
+test before shipping.
+
+**v61 networking:** `net lerp 0.300` works; `net reopen` on B returned
+`net reopen -> 1 (port 47778)` and reconnected (`state=1`, `conv=16/31`,
+`peerpos` updating). `smfrz` reached 255k on B / 202k on A with `setfail=0`,
+`smstate` ~4k; `posfail=2` and `snaps=2` are leftovers from the fall/teleport.
+
+**Walk sync still works:** while A backed up (`S`) from `167.34` to `174.81`,
+B's puppet action SM read `idx=6 name='Ped'`; B's `peerpos` followed
+`174.81,10.21,-165.70`. A forward `W` walk to `167.34` also updated B's
+`peerpos`. The first read during a walk can still catch `Idle` before the
+250 ms mapping tick; later reads show `Ped`.
+
+**Combat mapping verified by direct SM reads:**
+* A punched: B's peer state was `...h2h|QuickAttackLPrime...`, and B's puppet
+  action SM (`0x1B4562E0`, index at `+0x0C`) read `0x1F` = `MeleeAttack`.
+* B entered free aim with a pistol: A's peer state was
+  `...noTargetFreeAim|freeAim|strafe...`, and A's puppet action SM
+  (`0x1B576F60`, index at `+0x0C`) read `0x0C` =
+  `FireGunStationaryAction`.
+The `sm` console command is too slow/stale to catch short states; read the
+action SM index directly while the peer is in the state.
+
+**Input note:** synthetic left clicks on A produced punches, while the same
+clicks on B entered free aim/fire because B was holding a pistol. B's aim state
+persisted until the pause menu was closed; it is a real gameplay state, not a
+mapping failure.
+
+**Teleport lesson:** `tp 190.0 10.224 -172.0` put A outside the interior floor;
+A fell through the world to `y=-1949` and had to be restarted. Do not teleport
+to arbitrary `y=10.224` coordinates; use keyboard movement or verified interior
+positions (`185.9,10.224,-172.2` and the walked corridor are safe).
+
+**Appearance:** after A reloaded, the auto-picked puppet was a red-shirted
+borrowed NPC (closer to the player than the earlier dark suit), but it is still
+a borrowed body; `amatch=0 aapplied=0` remains. Evidence:
+`local/dual_v61_loaded.png`, `dual_v61_final.png`, `dual_v61_verified.png`,
+`dual_v61_B_infront.png`, `dual_v61_punch2.png`,
+`dual_v61_B_punch_Aview.png`, `dual_v61_after_esc.png`.
+
+**Live state at handoff:** A `174.69,10.21,-165.82` (host, idle), B
+`169.24,10.21,-172.50` (client, free aim with pistol); both connected, windows
+side by side, v61 loaded. Next: profile-state `resume` test, player appearance,
+vehicle mapping, and a longer smfreeze stability run.

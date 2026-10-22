@@ -1711,3 +1711,23 @@ of the peer's class exists on the client near the peer, and check visually
 whether writing `+0xC0` moves it. If not, call the vehicle's slot 7 with a
 position pointer (`__thiscall(void*, float*)`), which matches the observed
 `ret 4` signature.
+
+## 2026-10-22, eighth session: the peer's car is not a shared world object
+
+Checked with the owner sitting in a car in the host window while the client
+stood 12 m away: the client receives `fl=1` and `vclass=0x00D759AC`, but its
+vehicle table stays empty - no object of that class exists in the client's world
+near the peer at all. The car the host drives is a **locally simulated vehicle**
+of that client, not a shared world entity, so no amount of scanning will find
+"the same car" on the other side.
+
+Conclusion: showing the peer's car requires *creating* a car in our world and
+driving it to the peer position (spawn path unverified and risky on this engine)
+or attaching the borrowed puppet body to a local car's seat (writes into the
+Sentient vehicle SmartPtr at `+0x1E40`, also unverified). Both are bigger than
+the rest of the vehicle work and should not be attempted without a test plan.
+
+What is already in place and worth keeping: the packet carries the peer's
+vehicle class in the last field, the player's vehicle pointer is read from
+`+0x1E40`, and a vehicle table + nearest-selection + direct matrix write exist
+behind `peer_vehicle_apply`. They simply have nothing to attach to.

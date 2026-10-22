@@ -2318,3 +2318,22 @@ disabled), `conv=16/32`, `peerpos` tracking. No new `APPCRASH` event in the
 last hour: the `0x004C0BA1` crash did not recur under movement stress. This is
 stronger evidence that the worker `PlayAnim` on a freed body was the fault;
 a multi-hour soak is still open.
+
+## 2026-10-22, twenty-eighth session: player-model swap dead end, body restored
+
+**Experiment:** on B's puppet `0x062FDAF0`,
+`setparts 0x062FDAF0 mobface - - player` returned `write=ok rebuild=queued`.
+The game survived, but the puppet disappeared/headless - the known
+player-model-on-NPC dead end. The part strings became
+`preset='mobface'`, `theme='corleoneassociate_0030_main'`,
+`swapset='def_0002'`, `assembly='player'`. Restoring
+`setparts 0x062FDAF0 corleoneassociate_0030_main - - fam_corleone` plus the
+queued rebuild brought the visible body back; no crash. Do not repeat the
+player-model swap without a proper model-clone path.
+
+**Final live state:** A = PID 24808, player `0x14F1A9A0`, host 47779, target
+`0x05F6A3A0` (Tommy), pos `170.33,10.21,-170.53`; B = PID 14600, player
+`0x14E37B20`, client 47778, target `0x062FDAF0` (associate, restored), pos
+`185.94,10.22,-172.80`. `calls/applied` 34388/36619, `setfail=0`,
+`posfail=0`, `snaps=0`, `smfrz` 135236/149952, `conv=16/15`. Both v67,
+connected, alive.

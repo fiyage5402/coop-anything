@@ -1789,3 +1789,18 @@ read from inside the game by the plugin's `read` command (player position:
 peek 28.31/1.92/-26.28 versus in-process 171.69/10.46/-211.95). Pointers
 seemed to match, payload data did not. All measurements from now on use the
 plugin's own `read` command, which reads the game's real address space.
+
+### Where the state machine actually lives in this build
+
+The SDK layout for `Sentient` does not match the PC build: the state machine
+tree is at **`obj+0x3AC`** (two dwords: flags, root pointer at `obj+0x3B0`),
+and `CharacterProxy` starts at 0x3C0 (its first dword is a vtable pointer
+0x00E39F10). The SDK's `statemachine.h` offsets for `StateMachine` itself are
+also off, so v47 searches for the root machine by shape instead of by offset:
+
+* the machine starts with a code vtable,
+* `+0x0C` holds an array of state pointers,
+* one of the fields in `+0x04..+0x30` points back into the entity.
+
+The command `findsm <obj>` prints every candidate with its state names, `sm
+<obj>` prints the tree, `smnames <obj>` lists all states of all machines.

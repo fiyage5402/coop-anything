@@ -2272,3 +2272,9 @@ B = PID 18568, player `0x14F27B20`, client 47778, target `0x063C78A0`
 
 **Build:** `local/coopcore_v66.asi`, 222208 bytes; v64/v65/v66 were each
 deployed and booted, v66 is the live build. `resume` remains disabled.
+
+**Two-minute stability soak (v66):** after the tests above, both clients idled
+for 120 s. Processes A (11000) and B (18568) stayed responsive; A
+`calls/applied=13063`, B `14564`, `setfail=0`, `posfail=0`, `snaps=0`,
+`smfrz` 52292/59792, `conv=31/16`, `peerpos` stable. No crash or counter
+regression. This is a short soak, not a long-run leak test.

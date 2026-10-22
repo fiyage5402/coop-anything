@@ -1804,3 +1804,47 @@ also off, so v47 searches for the root machine by shape instead of by offset:
 
 The command `findsm <obj>` prints every candidate with its state names, `sm
 <obj>` prints the tree, `smnames <obj>` lists all states of all machines.
+
+## 2026-10-22, tenth session: CCT state ids are SDBM hashes of the state name
+
+The decisive measurement: the player's live root state id was `0x46F5C7B4`, and
+**SDBM("idle") = 0x46F5C7B4** (the engine hash used by
+`StateMachineManager::GetStateTableIDFromName`, an SDBM variant:
+`h = c + (h << 6) + (h << 16) - h`, 32 bit).
+
+So a CCT state id is the hash of the state's *name*, and names are global to
+the game: the same name has the same id on every body. The earlier idea ("ids
+belong to the model, so they cannot be transferred") was wrong - the puppet
+simply never received a foreign id, because `find_root_sm` never found the
+state machine at all.
+
+Measured layout of this build (the SDK's `statemachine.h` is off by 4 bytes):
+
+```
+Sentient+0x3AC   state machine tree { m_EvalFlags, m_Root }   (root at +0x3B0)
+StateMachine     +0x08 m_StateTableID   (name hash, e.g. 0xAA067D00)
+                 +0x0C m_CurStateIdx
+                 +0x10 m_States         (packed table loaded from the game data)
+                 +0x14 m_EvalFlags
+                 +0x18 m_Tree           (points back at Sentient+0x3AC)
+                 +0x1C m_Parent         (0 for the root)
+                 +0x20 m_ChildHead
+                 +0x24 m_ChildTail
+                 +0x28 m_Next
+                 +0x2C m_AllocNumber
+                 +0x30 m_TimeInCurrentState (float)
+```
+
+The state table itself is a packed block (names are stored inline, e.g. the
+string "star" at +0x18 of the table, with the state hashes around it), so the
+name lookup path of v46/v47 cannot read names yet - but it is not needed any
+more, because the ids themselves are portable.
+
+v48 therefore:
+
+* finds the root state machine directly at `obj+0x3B0` (no more heuristic
+  search, which produced false positives);
+* plays the peer's state id on the puppet again (primary state plus the two
+  secondary action states of the weapon chain);
+* keeps the name based path as a fallback and counts both in the diagnostics
+  (`anim=` and `smstate=` in `netdiag`).

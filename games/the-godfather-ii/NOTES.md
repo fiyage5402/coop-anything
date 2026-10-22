@@ -2278,3 +2278,34 @@ for 120 s. Processes A (11000) and B (18568) stayed responsive; A
 `calls/applied=13063`, B `14564`, `setfail=0`, `posfail=0`, `snaps=0`,
 `smfrz` 52292/59792, `conv=31/16`, `peerpos` stable. No crash or counter
 regression. This is a short soak, not a long-run leak test.
+
+## 2026-10-22, twenty-seventh session: crash analysis and v67 worker hardening
+
+**Crash reports found in WER:** two `APPCRASH` events for `godfather2.exe`
+(same build 1.0.789.0) at 18:32 (A) and 19:17 (B), both exception
+`0xc0000005` at **`0x004C0BA1`**, faulting module `godfather2.exe`. The
+instruction there is `movl %eax, 0x34(%esi)` in a game state setter, i.e. a
+write through a bad `this` pointer. The most likely path is the animation
+worker's `PlayAnim` fallback (`anim_post(1, ...)` -> `entity_plays_anim`):
+the borrowed body can be streamed out/freed between the frame-hook liveness
+check and the worker's engine call.
+
+**v67 hardening:** the worker no longer calls `PlayAnim` on the borrowed body.
+It only applies state-machine names, and re-checks
+`entity_is_animated_character(obj)` immediately before doing so. The direct CCT
+AnimView write (game thread) and the action-SM name mapping remain; the
+`anim=` diagnostic is now 0 because the fallback counter is unused, while
+`smstate` still increments. Built `local/coopcore_v67.asi` (222208 bytes),
+deployed to both copies, both booted.
+
+**v67 verification:** targets attached (A `0x05F6A3A0` = `unq_tommy_cipolla`,
+B `0x062FDAF0` = `corleoneassociate_0030_main`). Walk: B's action SM read
+`idx=6` (`Ped`) while A walked to `177.8`; `peerpos` followed. Punch: A clicked
+and B's action SM read `idx=0x1F` (`MeleeAttack`) with the 450 ms hold.
+`setfail=0`, `smfrz` 15k, `anim=0`, `smstate` 273. Screenshot:
+`local/dual_v67_walk.png` (remote body visible in B's doorway; local walk
+animation works).
+
+**Live state:** A = PID 24808, player `0x14F1A9A0`, host 47779; B = PID 14600,
+player `0x14E37B20`, client 47778; A pos ~`177.8,10.22,-172.8`, B at start.
+A 10-minute soak is the next step; the 0x004C0BA1 crash must not recur.

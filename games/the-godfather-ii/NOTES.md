@@ -1398,3 +1398,24 @@ v20 (local/coopcore.c) adds the console command `mobface <obj> [slot]`
 (default slot = player) and re-enables the primary anim application (it is
 applied only when the peer's id changes). Next test: apply `mobface` to the
 puppet in each client, then walk/aim/shoot and compare.
+
+### mobface crash analysed (do not repeat blindly)
+
+`mobface <obj>` (BuildModelFromSavedData with FAMILYTREE_SLOT_PLAYER on a live
+crew NPC) crashed the game: the faulting address 0x005C16AB is **int3 padding**,
+i.e. the game jumped through a corrupted pointer inside its own model/animation
+binding code. The model swap on a character whose state machine and anim view
+are already running invalidates internal references, so this call sequence is
+not safe.
+
+Safer options for making the puppet look like the remote player:
+
+1. `PartedAnimated::TrySwapModel(assembly, preset)` - the NPC inspector's
+   "SWITCH" button path (SDK: modules/partedanimated). Needs the assembly and
+   preset name strings; the player's current names still have to be read.
+2. Build the puppet's model before its state machine starts (spawn a fresh
+   character with the player's model) instead of swapping on a live one.
+3. Accept a different character model and map animation state ids by name
+   (CCT state names), not by raw id.
+
+Until one of these is proven, keep `mobface` unused.

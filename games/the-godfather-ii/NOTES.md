@@ -2822,3 +2822,32 @@ be used as the primary identity.
 - Evidence: `local/dual_v100_car_drive.png`.
 
 **Live:** A 13396, B 10432, both v100, host/join auto, start.
+
+## 2026-10-23, forty-second session: car orientation and the ghost collision
+
+**User report:** the car moves, but the passenger cannot enter; the car looks
+like it only moves in one direction; after driving away from the spawn the car
+has a model but no collision and no enter prompt.
+
+**Diagnosis:**
+- `G2CF` read yaw from `veh+0xB0`, which is the matrix position copy, not the
+  forward row. The car's world matrix is at `+0x78`: row0 position, row1 right
+  (`+0x88`), row2 up (`+0x98`), row3 forward (`+0xA8`). v105 reads yaw from
+  `+0xA8` and writes the three rotation rows on the receiver.
+- The ghost is not a matching bug any more. `vehicle_setpos` changes the matrix
+  and several transform copies, but the Havok/collision body and the enter
+  prompt stay at the original spawn. The visual car moves; the collision does
+  not. Updating all copies of the old position inside the car/base did not move
+  the prompt either.
+- Tried engine setters: vehicle vtable slot 12 crashed on a `0xD626C4` car;
+  base slot2 (`0x0046F4F0`) returned without changing the matrix. These paths
+  are unsafe and are not used.
+- A real car must be spawned through ObjectManager/SimManager (or moved through
+  Havok) to have collision and seats at the new position. That is the missing
+  piece for passenger entry.
+
+**v105:** yaw is sent from `+0xA8` and applied to `+0x88/+0x98/+0xA8`.
+**Live:** A 23896, B 22460, both v105, host/join auto, start; no crashes.
+
+**Not fixed:** passenger entry and collision/enter prompt. The current car sync
+is a visual proxy; do not treat it as a physical car.

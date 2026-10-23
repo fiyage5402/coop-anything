@@ -2883,3 +2883,25 @@ vehicle spawn/physics path.
 
 **Final live state (this run):** A 10076, B 17588, both v111, host/join
 connected, start; `parts 0`, car visual proxy only.
+
+## 2026-10-23, forty-fourth session: 1 FPS while car moves
+
+**Symptom:** the client dropped to ~1 FPS while the car moved, stayed frozen
+for 10-15 s after it stopped, and the car never turned.
+
+**Cause:** v110 added a scan of the car object, its vehicle base and the Havok
+object (`0x1000` + `0x1000` + `0x4000` bytes) inside `vehicle_setpos`, which
+runs at 20 Hz on the game thread.  That is ~100k float checks per second on the
+render thread.  The 10-15 s recovery was the Havok scan finishing.
+
+**Fix v112:** removed all per-frame scans.  `vehicle_setpos` writes only the
+known transform copies at fixed offsets, guarded by the old position:
+`+0x78/+0xB8/+0xD8/+0x798`, base `+0xC0/+0x100/+0x120/+0x7E0/+0xE08`, plus the
+four linked components.  Crafted continuous `G2CF` test now gives **60.8 FPS**
+with `pcapplied=65` and no freeze after the packets stop.
+
+**Yaw:** v113 falls back to the player yaw if the car-forward yaw is zero and
+logs `pyaw`; visual rotation is still not confirmed.  The car remains a visual
+proxy: collision/enter prompt is not moved.
+
+**Live:** A 22680, B 17424, both v113, host/join connected, start, `parts 0`.

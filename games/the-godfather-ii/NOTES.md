@@ -2929,3 +2929,24 @@ Evidence: `local/dual_v120_yaw_fps.png`.
 **Still open:** the remote car remains a visual proxy (no collision/enter
 prompt, no passenger), because Havok collision is not moved.  Current: A 2192,
 B 21452, both v120, host/join connected, start.
+
+## 2026-10-23, forty-sixth session: entering a moved car snaps to Havok spawn
+
+**User report:** after the car is left and another player enters it, the player
+and car teleport back to the car's original world spawn; yaw still looks wrong.
+
+**Confirmation:** this is the same ghost issue.  The client car's matrix/base
+copies are moved, but its Havok body and collision remain at the original spawn.
+Entering the car makes the engine restore the car from Havok, so the visual
+position is replaced by the original spawn (and the player moves with it).
+Freezing `m_UsePhysics` (`vfreeze 0`) did not make the prompt appear or prevent
+the snap.
+
+**FPS/yaw:** v120 removed the per-frame car/base/Havok scans (the 1 FPS cause)
+and pins the heading with base rotation copies; A's matched car reached the same
+forward vector as B (`yaw -3.035`).  Visual yaw still depends on the physics
+body, which is why the user can still see a stale heading after entering.
+
+**Conclusion:** matrix writes are a visual proxy only.  The next real fix is
+spawning the car through ObjectManager/SimManager (or moving its Havok body),
+not more matrix/rotation writes.  Current A 2192 / B 21452, v120.

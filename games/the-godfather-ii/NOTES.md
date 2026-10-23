@@ -2624,3 +2624,49 @@ layers on gave ~68/56 FPS.
 **Live state:** A PID 15132, player `0x14F37B20`, host; B PID 25320, player
 `0x14E67B20`, client; both v90, car spot; `actors 0`, `traffic 1`, `doors 1`,
 `avatar 1`, `trafficsend 1`, `trafficapply 1`; no crash during the FPS soak.
+
+## 2026-10-23, thirty-sixth session: camera/avatar diagnosis, player-car packet
+
+**User report:** remote model invisible; camera detaches/zooms to the peer while
+walking and returns on stop; driving a car does not move it for the other
+client.  Also proposed a host/join menu with an empty client world that streams
+the host world (traffic, NPCs, missions, weapons, reactions).
+
+**Camera root cause:** the `avatar` layer spawns a second real `Player` via
+SimManager.  `PlayerManager` then contains `arr[0] = local`, `arr[1] = clone`
+(observed live on both clients).  The engine treats the clone as a player and
+the camera switches/follows it; because the clone is at the peer position the
+camera ends up inside it, which is why there is no visible remote model there
+and why the camera lurches/zooms while walking.  The avatar path is also not
+stable: after spawn/manager experiments a game died at `0x006D21AA`
+(`vehx: av ...`), and another at `0x004829FE` after an external vehicle-pointer
+test.  `avatar` is therefore **off** in the working configuration; it remains
+experimental and must not be used for normal co-op.
+
+**Remote body now:** with `avatar 0`, the auto-target attaches a live NPC as the
+peer puppet (`target=...`), so a body is present, but it is an NPC appearance,
+not the remote player's model.  Actor table sync (`actors 1`) costs a lot
+(28-33 FPS in crowded spots); `actors 0` still leaves the single auto-target
+puppet attached and gave A 41 / B 42 FPS at the start with traffic+doors on.
+Exact player appearance transfer is still TODO.
+
+**Car sync:** the old path only moved a class-matched car through
+`peer_vehicle_apply` while the peer was inside a vehicle, and the traffic
+optimisation skipped sending a stationary/own car.  v91 adds a dedicated
+`G2CF` packet (20 Hz, 32 B): class vtable, vehicle world row (+0x78), yaw.
+`peer_car_apply` matches a car of the same class near the sent point, excludes
+the local own vehicle, and eases position at 20 Hz; the old class fallback is
+suppressed while G2CF is fresh.  `netdiag` now reports `pcar/pcapplied`.
+Position is synced; yaw is carried but not yet applied to the vehicle matrix.
+External tests that set `player+0x1E40` by hand killed the game, so the path
+still needs a **real enter-car** two-client test.
+
+**Menu idea:** architecturally sound: host owns simulation, client loads an
+empty/streamed world and receives authoritative state; this avoids driving two
+independent worlds and would remove most puppet/avatar hacks.  Native menu
+buttons need UI hook work; a low-risk interim is console `net host` / `net join`
+plus an overlay.  Not implemented this session.
+
+**Live state:** A PID 17728, B PID 18096, both v91; `actors 0`, `traffic 1`,
+`doors 1`, `avatar 0`; start interior; targets attached; camera stable; no crash
+during the FPS check.

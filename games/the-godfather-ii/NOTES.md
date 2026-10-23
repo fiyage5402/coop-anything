@@ -2670,3 +2670,36 @@ plus an overlay.  Not implemented this session.
 **Live state:** A PID 17728, B PID 18096, both v91; `actors 0`, `traffic 1`,
 `doors 1`, `avatar 0`; start interior; targets attached; camera stable; no crash
 during the FPS check.
+
+## 2026-10-23, thirty-seventh session: host/join foundation
+
+**Implemented (v92-v94):**
+- New console commands:
+  - `net host [port]` — bind the host UDP port and persist `mode host`;
+  - `net join <ip> [port]` — bind an ephemeral client port, send `G2CH`
+    handshake to the host, learn the host endpoint from replies;
+  - `net stop` — disable and persist.
+- `G2CH` handshake (version + role) is sent at 1 Hz until the first valid
+  packet. The receiver learns the sender's address/port from `recvfrom`, so the
+  client no longer needs a fixed local port and works behind NAT for outbound
+  connections.
+- All G2CP/G2CT/G2CA/G2CV/G2CD/G2CF sends now go through `net_send_to_peer()`
+  and use the learned endpoint.
+- Host/join commands write `coop_net.cfg` (`mode`, `port`, `ephemeral`, `peer`)
+  and lock the cfg reload for the session, so a restart reconnects automatically.
+- `net` output now shows `conn`, `peer=ip:port`, `self=localport`, `hs`.
+
+**Verified live:** A `net host 47779` -> binds 47779; B `net join 127.0.0.1
+47779` -> binds ephemeral 60049; both report `conn=1`, A sees peer
+`127.0.0.1:60049`, B sees `127.0.0.1:47779`. Position packets cross (`tr 2 0 0`
+on A moved B's reported peer position to 187.70). After killing both and
+restarting from the saved cfg, they reconnect automatically without commands.
+
+**Not done:** native menu buttons / literal empty client world. Native menu
+needs UI/Apt frontend work; the empty-world architecture is a larger project
+(entity IDs, spawn/despawn, mission scripting). Current host/join is the
+foundation and still uses the same world on both sides.
+
+**Live state:** A PID 8844, B PID 3304, both v94; auto host/join, client
+ephemeral; `actors 0`, `traffic 1`, `doors 1`, `avatar 0`; start interior;
+FPS A 48.5 / B 51.0; targets attached; camera stable.

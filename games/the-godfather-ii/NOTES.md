@@ -2905,3 +2905,27 @@ logs `pyaw`; visual rotation is still not confirmed.  The car remains a visual
 proxy: collision/enter prompt is not moved.
 
 **Live:** A 22680, B 17424, both v113, host/join connected, start, `parts 0`.
+
+## 2026-10-23, forty-fifth session: car FPS and yaw fixed
+
+**FPS:** v110's car/base/Havok scans were the 1 FPS + 10-15 s freeze.  v112
+removed them; a crafted moving-car test gave 60.8 FPS.  The yaw helper initially
+wrote every 10 ms unconditionally, which cost frames; v120 writes only when the
+heading differs and sleeps 40 ms.
+
+**Yaw:** two bugs:
+- `peer_car_apply` returned on the 5 cm position threshold before touching
+  rotation, so a car already near the sent position never turned;
+- vehicle physics rewrites the heading during the frame, so a 20 Hz write was
+  lost.  The base has two more rotation bases at `+0x90/+0xA0/+0xB0` and
+  `+0xD0/+0xE0/+0xF0`; v115 writes those too, and v119/v120 pin the matched
+  car's heading from a small worker.
+
+**Live test:** B drove the black limo and turned; A's matched car ended with
+forward `(-0.107, 0, -0.994)`, yaw `-3.035`, exactly B's `(-0.106, 0, -0.994)`;
+A FPS while syncing was 51.7, B 86.6 at rest, no freeze after stop.
+Evidence: `local/dual_v120_yaw_fps.png`.
+
+**Still open:** the remote car remains a visual proxy (no collision/enter
+prompt, no passenger), because Havok collision is not moved.  Current: A 2192,
+B 21452, both v120, host/join connected, start.

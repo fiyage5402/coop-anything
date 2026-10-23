@@ -2988,3 +2988,24 @@ or use the ObjectManager spawn list; then read the real stream GUID and spawn
 after the stream-load event.  Matrix-only car sync remains a visual proxy.
 
 **Current:** A 2192, B 9404, both v120, host/join connected, start.
+
+## 2026-10-23, forty-ninth session: Havok transform found, spawn path ruled out
+
+**Havok transform (limo 0xD759AC):** base = car-0x48.  The same 4x4 matrix is
+aliased at `*(base+0x364)+0xA0` and `*(base+0x368)+0x2E0`:
+right/up/forward/position at +0x00/+0x10/+0x20/+0x30.  For the 0xD626C4 car
+there are four copies at `*(base+0x3B0)+0x100/0x180/0x200/0x280` (+0x10 rows).
+Writing the full matrix moved the car only a few centimetres and was
+immediately overwritten by physics; `m_UsePhysics`/base+0x394=0 did not stop
+the overwrite.  A 40 ms worker pin (v129) also lost the race and made the proxy
+car drift, so it was reverted for the stable client.
+
+**Spawn:** `SimManager::SpawnEntity` is `0x0446340`/body at 0x446340.  It takes
+the packet's GUID via `0x43AB10` (compact packet: flags at +0x1C, GUID offset
+at +0x24), checks StreamManager status, then creates the handler.  The
+SimManager hash entries (`sim+0x80`) are *not* compact attribute packets:
+their flags are 0x1F..0x48 and have no valid GUID; calling with them crashed a
+worker at 0x43AB62.  Need the ObjectManager attribute packet/GUID, not the
+hash entry.
+
+**Stable state:** A 2192, B 6892, v120, host/join connected.

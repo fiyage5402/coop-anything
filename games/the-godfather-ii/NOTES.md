@@ -2969,3 +2969,22 @@ enumerable without the SDK's `ForEachPacket`.
 
 **Current:** A 2192, B 15448, both v120, host/join connected, start.  The
 visual proxy remains; no passenger/collision.
+
+## 2026-10-23, forty-eighth session: stream-aware spawn attempt
+
+**Progress:** located SimManager packet hash (`sim+0x80`, 511 bins/124 packets)
+and vehicle packet names at `+0x28` (`DOWD1646`, `MURPHY02`, `MOCSY173`).
+Added `spawnpkt` worker with ObjectManager's stream recipe:
+`CAttributeCommandIterator(packet,0xAE986323).SeekTo(5) -> GetAs_RWSGUID ->
+GetGuid32 -> StreamManager::GetStreamHandle/Load`.
+
+**Result:** the tested packet returned `guid=0, handle=0`; the packet is not the
+class the iterator expects (or the class/command offset is wrong).  `0x0483410`
+then blocked waiting for streaming, so no car was spawned.  Worker stayed off
+the game thread, so the client remained playable.
+
+**Next:** identify the actual vehicle packet class ID (`GetIdOfClassToCreate`)
+or use the ObjectManager spawn list; then read the real stream GUID and spawn
+after the stream-load event.  Matrix-only car sync remains a visual proxy.
+
+**Current:** A 2192, B 9404, both v120, host/join connected, start.

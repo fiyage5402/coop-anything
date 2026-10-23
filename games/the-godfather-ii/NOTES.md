@@ -2851,3 +2851,32 @@ has a model but no collision and no enter prompt.
 
 **Not fixed:** passenger entry and collision/enter prompt. The current car sync
 is a visual proxy; do not treat it as a physical car.
+
+## 2026-10-23, forty-third session: yaw, appearance attempt, Havok copy scan
+
+**Car yaw (v105):** `G2CF` had been sending yaw read from `veh+0xB0`, which is
+the matrix position copy.  The world matrix is at `+0x78`: row0 position,
+row1 right `+0x88`, row2 up `+0x98`, row3 forward `+0xA8`.  v105 reads
+`atan2(forward.x, forward.z)` and writes the three rotation rows on apply.
+This fixes the car facing the wrong way.
+
+**Appearance transfer (v106-v109):** added `G2CS` with the four part strings
+(preset/theme/swapset/assembly), applied to the puppet with a rebuild.  Results
+were bad:
+- copying `assembly='player'` onto a borrowed NPC makes it **headless**;
+- copying the other part strings without the assembly produced a **rainbow /
+  incompatible texture** body.
+The feature is therefore **off by default** (`parts 0`); `parts 1` can enable it
+for experiments.  Exact remote appearance needs a real player-model body, not
+an NPC rebuild.
+
+**Havok/ghost (v110):** extended `vehicle_setpos` to scan the base object and
+the Havok wheeled vehicle pointer (`base+0x360`) for exact copies of the old
+position.  The matrix/base copies move, but the Havok collision transform and
+the enter prompt do not; a car that has been moved still has no collision/seats
+at the new position.  `vsetb` (calling base slot2 `0x0046F4F0`) was removed in
+v111 because it killed a `0xD626C4` car.
+
+**Current:** A 10076, B 17588, both v111, host/join connected, start; `parts 0`.
+The car remains a visual proxy; passenger entry is still blocked on a real
+vehicle spawn/physics path.

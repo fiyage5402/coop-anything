@@ -2703,3 +2703,42 @@ foundation and still uses the same world on both sides.
 **Live state:** A PID 8844, B PID 3304, both v94; auto host/join, client
 ephemeral; `actors 0`, `traffic 1`, `doors 1`, `avatar 0`; start interior;
 FPS A 48.5 / B 51.0; targets attached; camera stable.
+
+## 2026-10-23, thirty-eighth session: vehicle physics findings
+
+**User report:** the driver moves "through air", the second client's car stays
+parked, and sometimes a ghost car jerks forward/back with no collision.
+
+**Diagnosis:**
+- The car transform at `+0x78/+0xB8/+0xD8` is a matrix copy. Writing only those
+  rows is overwritten by the vehicle physics update on the next frame; this is
+  why `pcapplied` grew while the car did not move (and why a transient ghost
+  frame could appear).
+- A second problem is identity: class+position matching can select a different
+  car of the same model. On one live pair the client had no car at the sent
+  point at all; the "ghost" was another car of that class being moved.
+- Cars carry a readable identity/plate string around `+0xA4C` (`PERRY638` in
+  one test) and another around `+0xEC8`; that is a better key than class+distance.
+- The vehicle object also has transform-bearing components at `+0xCC`, `+0xE8`,
+  `+0x2A0`, `+0x2E8`. A manual test that shifted those components together with
+  the matrix rows made `+0x78` stay at the new position for one limo class, but
+  not for every class (a `0xD626C4` car still snapped back).
+
+**Code changes v95/v96:**
+- `vehicle_setpos` now shifts the linked component positions by the same delta
+  as the matrix rows.
+- `G2CF` v2 carries a 16-byte car identity from `+0xA4C`/`+0xEC8`.
+- `peer_car_apply` prefers the exact identity, then class+position in the nearby
+  list, then a bounded heap scan for the class near the sent point.
+- This is still not a complete fix: the client must have the same car loaded, or
+  the car must be spawned through ObjectManager/SimManager. A car that is
+  absent cannot be moved by writing addresses.
+
+**Model:** user suggested overlaying the partner's model on the joined player.
+This is feasible as an appearance transfer (send `preset/theme/swapset/assembly`
+and apply to the puppet via `setparts`/rebuild), but it is not the same as a
+real Player clone; the latter is still disabled because it hijacks the camera.
+
+**Live state:** A PID 8896, B PID 16832, both v96, auto host/join, start
+interior, `actors 0`, `traffic 1`, `doors 1`, `avatar 0`; targets attached;
+no crash during this check.

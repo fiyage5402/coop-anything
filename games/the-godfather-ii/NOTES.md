@@ -2796,3 +2796,29 @@ moved at all; `pcapplied=0`, `pcmatch=0`, `veh=0`.
 that spot), but the network/apply path is proven with real vehicle writes.
 
 **Live:** A 20584, B 3276, both v98, host/join auto, car spot.
+
+## 2026-10-23, forty-first session: duplicate car identity and real drive test
+
+**Symptom:** the second client still saw the car standing while the host drove.
+
+**Cause:** both limousines in the same area share the same plate/id
+(`PERRY638`). `peer_car_apply` kept the first cached same-class car, which was
+a *different* instance about 11 m away, and only moved that one. The real
+matching car was ~3 m from the sent transform but was ignored because the
+cached car passed the 25 m validity check.
+
+**Fix v100:** `peer_car_apply` always scans the nearby list and chooses the
+**nearest same-class car to the sent transform**; the cached match is only a
+fallback when the list has no candidate. Plates are not unique, so they cannot
+be used as the primary identity.
+
+**Real two-client drive test (both v100):**
+- A was in the black limo at `162.80 10.20 -219.08`.
+- B's matched car `0x0642A568` was at `162.82 10.20 -219.07` (correct instance).
+- A drove forward; A car ended at `140.73 10.19 -219.92`, B car at
+  `143.82 10.19 -219.80` (following with easing), `pcapplied=34`,
+  `pcmatch=0x0642A568`, no 1 FPS freeze.
+- B FPS after the test ~37.7 at the start area.
+- Evidence: `local/dual_v100_car_drive.png`.
+
+**Live:** A 13396, B 10432, both v100, host/join auto, start.

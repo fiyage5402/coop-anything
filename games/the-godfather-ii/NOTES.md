@@ -2429,3 +2429,57 @@ writes), but it did track the peer exactly during the drive test.
 at `180.763,10.161,-216.490`; B PID 25928, player `0x14F584A0`, client 47778,
 at the mansion start with the map open. Both v71; B `veh=10`,
 `vclass=0x00D759AC`, `vapplied=19458`.
+
+## 2026-10-22/23, thirty-second session: GF2ASI/mods research, time and NPC sync
+
+**Research read:** the public GF2ASI tree (README, ROADMAP, CONTRIBUTING,
+RESTRUCTURE_PLAN, Tools/README, SDK headers/sources) and the four supplied
+mods. The useful findings:
+
+* `TimeOfDayManager::GetInstance()` is `*(void**)0x112A53C`; its `GameTime`
+  block starts at `+0x5C` and is five int32 fields (year, day, hour, minute,
+  second). The manager's time scale/elapsed fields follow at `+0x70..+0x84`.
+* `MobfaceManager::BuildModelFromSavedData` = `0x09BF2F0`,
+  `MobfaceManager::GetInstance` = `0x11298A0`. It can rebuild a
+  `PartedAnimated` from the player/family slot; on an NPC it changes the body
+  and apparel (puppet now reports `preset='mobface'`, theme
+  `unq_tommy_cipolla`, assembly `player`) but the result is **headless** -
+  the player's head/face is a separate mobface/meta-model, not a parted body
+  part. Do not call it automatically on the puppet.
+* `PartedAnimated::TrySwapModel` / `ForceModelRebuild` (`0x09C58C0`) are the
+  SDK's model-swap path; `PartedModelMgr::GetInstance` is `0x112990C` and can
+  enumerate assemblies/presets. This is the route for a full (headful) model
+  preset, but the player-specific `mobface` preset is intentionally headless.
+* `SH_ObjectManager` in GF2ASI can spawn cars/NPCs/items from a
+  `SimManager` attribute-packet GUID (`RequestSpawnCar`, `Spawn`), with car
+  class `0x10E5319E`. That is the better long-term way to create the peer's
+  car on the client instead of moving a parked one.
+* `WhiteboxCar` stores `m_HavokWheeledVehicle` at `+0x360`, `m_UsePhysics` at
+  `+0x390`, seat SimNPCs at `+0xA4C`, part preset/assembly at
+  `+0xE5C/+0xE6C`, `PresetInstance` at `+0xE7C`.
+* PlayerAnimSwap hooks `AnimateStateMachine::PlayAnim` and
+  `Animated::GetStateID`; it confirms animation state names are per-character
+  tables. All Cars supplies vehicle model/seat-locator names in an `.sgp`;
+  Different Member Characters supplies `.vpat`/`.str` assets; Modern Fixes is
+  display/loader only. None of the four changes the sync design.
+
+**v72:** added `G2CT` game-clock packets (host authoritative, 1 Hz; client
+applies when the clock drifts by >=5 s) plus a `time` command. Vehicle list
+cleanup: `veh_note` requires a live local-player position, `vehlist` prunes
+cars >200 m away, and `peer_vehicle_apply` now requires the peer's exact class
+before selecting a car. The `mobface` command is the pre-existing worker path;
+our duplicate was removed. Version `v72 loaded`, 227328 bytes.
+
+**v73:** actor scan chunk raised from 4 KB/300 ms to 64 KB/50 ms, so the
+80 MB object range is covered in about a minute instead of hours. With
+`actors 1` in both `coop_net.cfg`, actor sync is live: A `act=19`,
+`amatch/aapplied` 5320, `peeract=8`; B `act=18`, 3589, `peeract=8`, both
+`setfail=0`, `posfail=0`, no crash. A 3-minute soak kept both alive and the
+counters increasing; the clock also stayed synced (`tapplied` 111). Version
+`v73 loaded`.
+
+**Live state:** A PID 12028, player `0x14D37B20`, host 47779; B PID 16636,
+player `0x14E37B20`, client 47778; both v73, start room, `actors 1`.
+`time` around 06:56; actor sync counters above. The B puppet is currently a
+headless mobface body after the appearance experiment; a restart restores the
+normal NPC body.

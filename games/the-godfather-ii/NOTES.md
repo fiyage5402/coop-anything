@@ -2880,3 +2880,6 @@ v111 because it killed a `0xD626C4` car.
 **Current:** A 10076, B 17588, both v111, host/join connected, start; `parts 0`.
 The car remains a visual proxy; passenger entry is still blocked on a real
 vehicle spawn/physics path.
+
+**Final live state (this run):** A 10076, B 17588, both v111, host/join
+connected, start; `parts 0`, car visual proxy only.

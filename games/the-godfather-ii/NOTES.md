@@ -2483,3 +2483,38 @@ player `0x14E37B20`, client 47778; both v73, start room, `actors 1`.
 `time` around 06:56; actor sync counters above. The B puppet is currently a
 headless mobface body after the appearance experiment; a restart restores the
 normal NPC body.
+
+## 2026-10-23, thirty-third session: traffic packets and model-head findings
+
+**v74 traffic:** added `G2CV` packets at 4 Hz carrying up to eight nearby vehicles
+(class vtable, position, yaw) when the peer is on foot. The receiver matches a
+local vehicle of the same class within 12 m of the sent position and eases it
+at 10 Hz (`peer_vehicles_apply`, `pvapplied`). `traffic` is a `coop_net.cfg`
+flag, default 0. With a static black limo registered on both sides the path is
+live: A `veh=1`, B `pveh=1`, `pvapplied` 32 and rising, `setfail=0`. Moving AI
+traffic has not been captured yet; the limo is parked, so the sent position is
+constant. The car's `+0x360` is not a Havok pointer in this build (reads 0x2C),
+so v75's traffic discovery uses the vehicle vtable slot 8 destructor
+(`0x0046C720`) plus a non-zero `+0x360` and the existing `+0x78` position
+validation.
+
+**v75 traffic discovery:** the actor scan now recognises vehicle classes while
+`traffic 1`, not only while the peer is already in a car. This is what made the
+nearby black limo appear in `veh`/`pveh`. The scan still needs to reach the
+object range; `vehadd <addr>` is the immediate way to seed a known car.
+
+**Exact appearance:** `mobface` (BuildModelFromSavedData) changes the puppet's
+body/apparel to the player's (`preset='mobface'`, theme
+`unq_tommy_cipolla`, assembly `player`) but the result is **headless**. The
+head/face lives in the Entity's `MetaModelInstance` at `+0x130`, not in the
+parted body. Temporarily pointing the puppet's `+0x130` at the player's
+instance produced a headful duplicate near the player, but the instance is
+owner-bound (`+0x8` points at the player entity) and is not a safe clone; both
+pointers were restored and both clients stayed alive. A real fix needs a
+MetaModel clone or a spawned player-model NPC, not pointer sharing.
+
+**Live state:** A PID 12168, player `0x14F97B20`, host 47779; B PID 17856,
+player `0x14E97B20`, client 47778; both v75, at the Corleone car spot;
+`actors 1`, `traffic 1`; time ~06:04; B puppet still headless from the mobface
+experiment. The actor/time/traffic counters are increasing; a clean restart
+will restore the normal NPC bodies.

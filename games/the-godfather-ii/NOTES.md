@@ -2767,3 +2767,32 @@ freeze. With a cached match the per-frame path is only component writes.
 **Still open:** a car that is absent on the receiver cannot be moved; spawning
 it through ObjectManager/SimManager remains the next step. Appearance transfer
 for the remote puppet is also still TODO.
+
+## 2026-10-23, fortieth session: car stopped moving after v97
+
+**Symptom:** after moving the car scan to the worker (v97), the car no longer
+moved at all; `pcapplied=0`, `pcmatch=0`, `veh=0`.
+
+**Cause:** two independent list bugs:
+- `G2CP` cleared `g_vehCount` whenever the peer's vehicle class changed. That
+  emptied the nearby list, and `g_vehDiscover` had already been switched off
+  after the first 16 cars. The worker then had nothing to search.
+- The worker ran the ID scan first; the ID scan and class scan shared one
+  throttle timestamp, so after a failed ID scan the class scan was skipped for
+  another second.
+
+**Fix v98:**
+- Never clear the nearby list on peer class change; just re-arm
+  `g_vehDiscover`.
+- Re-arm discovery whenever the list has fewer than 8 vehicles and traffic or
+  a peer car is active.
+- Separate `g_peerCarClassAt` from the ID-scan throttle.
+- Nearby car match radius 12 m -> 30 m.
+
+**Verified with continuous crafted G2CF** for a local `0xD60DE4` car:
+`pcmatch=0x05BEE5B8`, `pcapplied=10`, the car moved from
+`169.09 11.42 -206.83` to `168.01 11.40 -208.97` and stayed there; B FPS ~31
+(no 1 FPS freeze). Real enter-car E test still did not trigger (no prompt at
+that spot), but the network/apply path is proven with real vehicle writes.
+
+**Live:** A 20584, B 3276, both v98, host/join auto, car spot.

@@ -2742,3 +2742,28 @@ real Player clone; the latter is still disabled because it hijacks the camera.
 **Live state:** A PID 8896, B PID 16832, both v96, auto host/join, start
 interior, `actors 0`, `traffic 1`, `doors 1`, `avatar 0`; targets attached;
 no crash during this check.
+
+## 2026-10-23, thirty-ninth session: car-sync FPS fix
+
+**Symptom:** the second client received the car movement but dropped to ~1 FPS
+while a car was being synced.
+
+**Cause:** v95/v96 called `vehicle_find_id()` / `vehicle_find_class_near()` from
+`peer_car_apply()` on the **game thread**. Those functions scan the
+`0x03000000-0x08000000` heaps for up to 1 s. With the 20 Hz car apply path this
+blocked the render thread almost completely. The scan was added to stop the
+ghost car (class+distance matched the wrong vehicle), but it must never run on
+the game thread.
+
+**Fix v97:** the game thread now only uses the cached `g_peerCarMatch` (and the
+nearby `g_vehAddr` list). If there is no match it sets `g_peerCarNeedMatch`; the
+actor worker performs the bounded ID/class scan and publishes the result with
+`InterlockedExchange`. `netdiag` now reports `pcmatch` and `pcneed`.
+
+**Live check:** with a crafted G2CF for a local car class, B's FPS was ~34 while
+the match was still unresolved (`pcneed=1`, `pcapplied=0`); no more 1 FPS
+freeze. With a cached match the per-frame path is only component writes.
+
+**Still open:** a car that is absent on the receiver cannot be moved; spawning
+it through ObjectManager/SimManager remains the next step. Appearance transfer
+for the remote puppet is also still TODO.

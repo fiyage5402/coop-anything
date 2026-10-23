@@ -2585,3 +2585,42 @@ was owner-bound and unsafe).
 **Current state:** A PID 23508, player `0x14E37B20`, host; B PID 360, player
 `0x14E384A0`, client; both v82, start interior, `actors 1`, `traffic 1`,
 `doors 1`, `avatar 1`; `shots` tested at 1; doors/traffic/avatar counters live.
+
+## 2026-10-23, thirty-fifth session: FPS investigation and traffic throttling
+
+**Symptom:** with all layers enabled the game fell to 3-8 FPS (A host worse than
+B). Turning all `coop_net.cfg` layers off restored ~54-79 FPS, so the drop was
+ours, not the two-client setup.
+
+**Measurements (A host, focused window, `fps` command):**
+- all layers off: ~54-62 FPS.
+- `actors 1` only: ~32 FPS.
+- `traffic 1` + `actors 1`: ~3 FPS while `pvapplied` stayed tiny; the cost was
+  not the position writes, it was continuously sending/applying a stationary
+  traffic list (and the v77-v86 vehicle-vtable discovery branch).
+- avatar only: ~102 FPS (the clone itself is not the problem when updates are
+  throttled); doors only: ~54 FPS.
+
+**v83-v90 fixes:**
+- v83: adaptive actor scan (6 ms/80 ms only while lists are sparse, otherwise
+  2 ms/5 s maintenance), vehicle discovery stops as soon as ~16 classes are
+  known, avatar position updates at 20 Hz and only when the target moved
+  >8 cm, state names only on change.
+- v84: skip traffic writes when the matched car is already within 15 cm of the
+  sent position.
+- v87: traffic wire list capped to 2 nearest cars, send 1 Hz / apply 4 Hz.
+- v90 (current): only **moving** cars are sent, one per packet; if no car moved
+  there is no packet and the receiver goes idle after 1 s. A manually nudged car
+  (`0x05688348`) made A send `sent 177.00...` and B's matched `0x051D2868`
+  follow to `176.43...`; `pveh=1`, `pvapplied` small, traffic still synced.
+- `fps` console command added: run it twice, separated by a few seconds.
+
+**Result:** at the mansion car spot with `actors 0`, `traffic 1`, `doors 1`,
+`avatar 1`: A ~58 FPS, B ~54 FPS (was 3-8). With `actors 1` the crowded car
+spot drops to ~33 FPS; NPC actor sync is the remaining expensive layer and is
+therefore **off in the current performance config**. At the start interior all
+layers on gave ~68/56 FPS.
+
+**Live state:** A PID 15132, player `0x14F37B20`, host; B PID 25320, player
+`0x14E67B20`, client; both v90, car spot; `actors 0`, `traffic 1`, `doors 1`,
+`avatar 1`, `trafficsend 1`, `trafficapply 1`; no crash during the FPS soak.

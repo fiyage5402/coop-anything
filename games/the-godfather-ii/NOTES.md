@@ -2518,3 +2518,27 @@ player `0x14E97B20`, client 47778; both v75, at the Corleone car spot;
 `actors 1`, `traffic 1`; time ~06:04; B puppet still headless from the mobface
 experiment. The actor/time/traffic counters are increasing; a clean restart
 will restore the normal NPC bodies.
+
+**Night/day check:** with A at the car spot, `time 22 0 0` set the clock and
+B followed to 22:03 (`tapplied=551`); both screenshots show the dark night
+lighting and street lamps (`local/dual_v75_night.png`). Setting the clock back
+to daytime also propagated. This is the first visual confirmation that the
+`G2CT` sync drives the lighting, not just the numbers.
+
+**Version fix:** the traffic build had accidentally kept the v74 version
+string. The final clean build is **v76**, `231424` bytes,
+`coopcore.asi v76 loaded`, containing all v72-v75 changes. A fresh boot of
+both clients was done for the handoff.
+
+**Final clean state:** A PID 17444, player `0x14F97B20`, host 47779; B PID
+8680, player `0x14D584A0`, client 47778; both v76 at the mansion start;
+`actors 1`, `traffic 1`; `act=17`, `amatch/aapplied` 1500/1676,
+`peeract=8`; `time` ~04:49 with `tapplied=19`; `setfail=0`, `posfail=0`.
+Traffic `pveh=0` at this spot because no vehicle is within 40 m of either
+player. The puppets are normal NPC bodies (no mobface/meta experiment on this
+fresh session).
+
+**Still open:** moving AI-traffic verification, gunshot FX/sound (fire
+animation already maps), doors/gates, and a safe headful player model
+(meta-model clone or spawned player-model NPC). The traffic path itself is
+live; only the moving-car case has not been captured.

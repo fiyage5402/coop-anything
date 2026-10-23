@@ -2542,3 +2542,46 @@ fresh session).
 animation already maps), doors/gates, and a safe headful player model
 (meta-model clone or spawned player-model NPC). The traffic path itself is
 live; only the moving-car case has not been captured.
+
+## 2026-10-23, thirty-fourth session: traffic, doors, gunshot audio, player clone
+
+**Moving traffic:** v77 taught the actor scan to recognise every vehicle class by
+the slot-8 destructor (`0x0046C720` / `0x0046F4F0`) and cache the vtable; v79
+added `traffic` diagnostics. At the mansion both clients discovered 30-32
+vehicles. A parked non-player car (`0x05C155E8`, class `0x00D60DE4`) was nudged
+through its physics: its sent positions changed (`175.9 -> 184.2 -> 177.6`),
+B's matched car (`0x05F8DD18`) followed every step, and `pveh=8`,
+`pvapplied=5000+`. This is the moving-traffic path, not just a static car.
+
+**Gunshot audio:** v81 adds a synthetic `coop_gunshot.wav` under `scripts/` and
+an edge detector on the peer's state names. A/B keep the existing fire-state
+mapping (punch `MeleeAttack`, fire `FireGunStationaryAction`, strafe/strafe fire,
+reload/draw); when a peer fire state appears the receiver plays the shot once
+and increments `shots`. Verified with a crafted `G2CP` carrying
+`FireGunStationaryAction`: B reported `shots=1` and the sound path is live. Real
+projectiles/damage are not spawned remotely yet; the remote body plays the fire
+animation and emits the shot sound.
+
+**Doors:** the live door objects are the `Door` base class (`0x00D6A2A8`), state
+at `+0x2B8`, current swing `+0x2A4`, max swing `+0x2AC`. v80 scans them,
+matches by static world position and sends `G2CD` (position, state, angle).
+Opening a door on A made the matched door on B open (`st=0 ang=1.50`,
+`dapplied` increasing); v81 adds a 1.2 s per-door remote lock so the applied
+state is not echoed back. Five door objects were found at the start interior
+and paired one-to-one.
+
+**Headful player model:** `SimManager::SpawnEntity` can instantiate the local
+player packet (`player+0x20`, the CAttributeHandler GUID). v82 does this into a
+real Player clone. It has vtable `0x00D6B350`, preset `mobface`, assembly
+`player`, and a non-null `MetaModelInstance` at `+0x130`, so it has a head and
+the full player mesh. It is placed at the peer's interpolated position every
+frame (`avapplied`), and the peer's state names are applied to its state tree.
+A three-minute soak left both clients alive with `avapplied` steadily rising
+(1297 -> 2273 on A, 1198 -> 1875 on B), `setfail=0`, no APPCRASH. The clone uses
+the local player's saved appearance, so the peer's face is not transferred yet;
+this is the safe headful model path rather than MetaModel pointer sharing (which
+was owner-bound and unsafe).
+
+**Current state:** A PID 23508, player `0x14E37B20`, host; B PID 360, player
+`0x14E384A0`, client; both v82, start interior, `actors 1`, `traffic 1`,
+`doors 1`, `avatar 1`; `shots` tested at 1; doors/traffic/avatar counters live.

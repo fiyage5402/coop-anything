@@ -2950,3 +2950,22 @@ body, which is why the user can still see a stale heading after entering.
 **Conclusion:** matrix writes are a visual proxy only.  The next real fix is
 spawning the car through ObjectManager/SimManager (or moving its Havok body),
 not more matrix/rotation writes.  Current A 2192 / B 21452, v120.
+
+## 2026-10-23, forty-seventh session: car packet discovery / spawn attempt
+
+**Found the SimManager packet hash:** `sim = *(0x1223410)`, hash at
+`sim+0x80`: `binArray`, 511 bins, 124 entries.  Each packet has a readable car
+name at `+0x28` (`DOWD1646`, `MURPHY02`, `MOCSY173`), so vehicle packets are
+enumerable without the SDK's `ForEachPacket`.
+
+**Spawn attempts:**
+- `spawnpkt <packet> x y z` queued on a worker, using
+  `SimManager::SpawnEntity(packet,0,0)` (`0x0446340`) — worker blocked.
+- same with `0x0483410` (create handler) — worker blocked.
+- both calls wait on streaming/post-spawn initialization; the game stayed
+  responsive because the call was on a worker, but no car appeared.
+- The next missing piece is the packet's stream handle / dispatching the
+  spawn from the stream-load event, as ObjectManager does.
+
+**Current:** A 2192, B 15448, both v120, host/join connected, start.  The
+visual proxy remains; no passenger/collision.

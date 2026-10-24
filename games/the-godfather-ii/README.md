@@ -112,13 +112,17 @@ only:
     `unq_tommy_cipolla` model (`model 1`), so it reads as a player instead of a
     random pedestrian;
   - **world layers**: day/night clock, nearby moving traffic, doors, and the
-    peer's own car (position + yaw; a visual proxy without collision);
+    peer's own car (position + yaw; a visual proxy without collision); while
+    the peer is in a vehicle the borrowed body is dropped under the world
+    (`hidecar 1`), so the proxy car is the visible representation;
   - **diagnostics**: a file-driven console (`coop_cmd.txt` -> `coopcore_cmd.txt`)
     with live counters for every apply path, plus crash and access-violation
     handlers;
 - own tooling: an external inspector/writer for the running game, a position
   finder, a container dumper, an input/screenshot driver, an exe byte patcher,
-  a D3D9 environment probe and an SDBM name hash tool.
+  a D3D9 environment probe, an SDBM name hash tool, and a one-click test
+  launcher that starts both disposable copies, loads the campaign through the
+  menu with injected scancodes, and arranges the two windows side by side.
 
 The machine's pre-existing profile, settings and campaign saves were verified
 byte-identical against a pre-work backup, and the original installation's
@@ -138,12 +142,14 @@ What the scripts check:
 3. the animation state id arrives and is re-applied (`anim`, `animforce` in
    `netdiag`);
 4. the peer state names arrive (`state='...'` in the `net` line);
-5. no plugin crash (`crash:` and `vehx:` lines stay empty in the log).
+5. the world layers apply (`tapplied`, `pvapplied`, `dapplied`, `pcapplied`);
+6. no plugin crash (`crash:` and `vehx:` lines stay empty in the log).
 
-There is **no** scripted menu path (the game reads the mouse through Raw
-Input, so the profile screen needs a real click) and **no** campaign
-playthrough in co-op yet, so the QA level is "automated for the sync layer"
-only.
+The menu path is scripted now: `boot_client.py` sends scan-code keys and the
+profile click, and the one-click test launcher chains start -> boot -> window
+arrangement.  The latest runs are a 6-minute idle soak and a 4-minute movement
+soak (319 scan-code moves), both clean.  There is still **no** campaign
+playthrough in co-op, so the QA level is "automated for the sync layer" only.
 
 ## How to play
 
@@ -151,8 +157,9 @@ Nothing to play: there is no co-op release. The internal test procedure is:
 
 1. start both disposable copies (the plugin redirects the profile paths into
    the copy, so the real profile is never written);
-2. in each copy: load the campaign profile and resume the save (a real mouse
-   click for the profile screen);
+2. in each copy: load the campaign profile and resume the save (the test
+   launcher scripts the profile click; a manual run needs a real click because
+   the game reads the mouse through Raw Input);
 3. the plugin connects over UDP loopback and each client picks up a puppet for
    the other one automatically;
 4. `coop_cmd.txt` next to the executable accepts `status`, `net`, `netdiag`,
@@ -167,7 +174,9 @@ Nothing to play: there is no co-op release. The internal test procedure is:
   body stays at the original spawn. A real car needs an
   ObjectManager/SimManager spawn with a valid stream GUID; the SimManager
   packet hash entries are not compact attribute packets, so that path is still
-  open.
+  open. While the peer drives, the borrowed body is dropped below the world
+  (`hidecar 1`) so the proxy car is the visible representation; that hiding
+  path has not yet been verified on an enterable car in the current save.
 - **The puppet cannot wear the peer's exact face.** It is rebuilt once to the
   shipped `unq_tommy_cipolla` model (`model 1`), a headful player-style body,
   so it reads as a player rather than a random pedestrian. Giving an NPC the

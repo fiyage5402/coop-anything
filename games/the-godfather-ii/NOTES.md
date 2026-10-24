@@ -3133,3 +3133,31 @@ what the player sees instead of a body standing on the roof. The command
 fresh client the RPC array allocators crashed at `0xD18B150A`; the low-level
 `callesi`/`writed` commands stay for manual work, and the private address map
 is in `local/RPC-FINDINGS.md`.
+
+## 2026-10-24, fifty-fourth session: soaks, launcher, time sync, car test
+
+* **Idle soak (6 min):** A `calls/applied` 28.5k, B 31.3k, `conv` 16-32,
+  `setfail=0`, `posfail=0`, `snaps=0`, both clients alive.
+* **Movement soak (4 min):** `local/soak_move.py` alternated W/A/S/D
+  scancodes between the two windows (319 moves). End positions A
+  `166.184 10.210 -167.318`, B `167.275 10.299 -214.988`; each client's
+  `peerpos` matched the other exactly, `calls` 70k/72k, `setfail=0`,
+  `posfail=0`, one snap, no `vehx:`, both alive.
+* **One-click launcher:** `local/start_coop.ps1` stops old clients, copies the
+  newest `coopcore_v*.asi`, forces the working config, starts A/B, boots both
+  through the menu with scancodes (`boot_client.py`), and arranges A left/B
+  right. Verified end-to-end: A host / B client, `model:` conversion on A,
+  `conv` 32/15, `setfail=0`.
+* **Time sync regression:** A `time 22 0 0` -> B `22:04`, `tapplied` 822;
+  A `time 12 0 0` -> B `12:04`, `tapplied` 827.
+* **Car / `hidecar`:** the old limo spot `171.508 10.221 -215.837` and the
+  `vehlist` points near it are static props or unreachable levels; `E` never
+  set `player+0x1E40` in four teleport sweeps. `hidecar` stays deployed but
+  needs a real enterable car test: enter any car and watch `hidden=` in the
+  other client's `netdiag`.
+* **Directory:** `data/directory.yaml` refreshed (`checked: 2026-10-24`) with
+  the current feature list and limits; `DIRECTORY.md` regenerated, but its
+  table does not render the notes.
+* **Final live:** A PID 24624 (`0x14EC7BA0`, `171.982 10.210 -172.473`), B PID
+  4620 (`0x14E384A0`, `173.000 10.210 -172.500`), both v136, ~1 m apart,
+  `conv` 15-32, `setfail=0`, windows A left/B right.

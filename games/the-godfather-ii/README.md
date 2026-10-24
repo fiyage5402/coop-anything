@@ -20,14 +20,20 @@ loaded, positions read from inside the game):
 
 | what | result |
 |---|---|
-| puppet position vs. peer position | **0.00 m** (exact, measured repeatedly) |
+| puppet position vs. peer position | **0.00 m** (exact, measured repeatedly); `conv` 15-31 ms in v136 |
 | heading | follows the peer's yaw |
-| animation state | the peer's CCT state id is transferred and re-applied; the owner's report: the puppet visibly mirrors the peer's stance |
-| automatic puppet pick | a real crew recruit near the player, with dead or streamed-out bodies replaced |
+| animation state | the peer's CCT state id is transferred and re-applied; state names map to the borrowed body (`Ped` walk, `MeleeAttack`, fire/strafe) |
+| appearance | the body is rebuilt once to the headful `unq_tommy_cipolla` model (`model 1`) |
+| automatic puppet pick | a real crew recruit/associate near the player, with dead or streamed-out bodies replaced |
+| world clock | day/night time propagated (`G2CT`) |
+| nearby traffic | moving cars mirrored as proxies (`G2CV`) |
+| doors | open state and angle mirrored (`G2CD`) |
+| peer's car | position and yaw match exactly; visual proxy without collision (`G2CF`) |
 | vehicle flag and vehicle class | both arrive at the other client |
-| round trip | 15-16 ms |
-| frame rate | 149 fps in the focused window, no plugin-induced stutter after the animation work was moved off the game thread |
-| crashes | none caused by the plugin since the instrumentation was added |
+| host/join | F9 host, F10 join loopback, role persisted in the config |
+| round trip | 15-31 ms |
+| frame rate | playable; ~40-60 fps in the focused window with traffic and doors on, actors off (earlier measured runs, no plugin-induced stutter) |
+| crashes | none caused by the plugin since the instrumentation was added; a v136 5-minute two-client soak stayed clean (26k/29k applies, `setfail=0`, `snaps=0`, both alive) |
 
 Research log with every address, measurement, crash cause and dead end:
 [NOTES.md](NOTES.md). The plugin source is not public yet.
@@ -184,13 +190,21 @@ Nothing to play: there is no co-op release. The internal test procedure is:
 
 1. Decide what to do with the vehicle: create a car in the client world and
    drive it to the peer, or drop the feature and document it as a limit.
-2. Give the puppet the protagonist's appearance without touching the live
-   character's model (copy the saved mobface and apparel data instead of
-   rebuilding the model in place).
+2. Give the puppet the peer's exact face and apparel. The current body is the
+   shipped headful `unq_tommy_cipolla` model (`model 1`); the saved `mobface`
+   preset is headless on an NPC, and `BuildModelFromSavedData` on a live
+   character crashes.
 3. Sync the world, not just the peer: the ambient layer needs stable entity
    identity (a GUID per NPC) and a crash-free way to move world characters.
 4. Turn the manual boot path into an automated one (script the menu with
    injected keys, add a watchdog that asserts the campaign map is reached).
 5. Then pick the networking model per `playbook/networking-steam-spacewar.md`
    for players outside the same machine.
+6. **Use the engine's own RPC/ghost layer.** The exe contains the EARS
+   `NetConnection`, `GhostConnection`, `NetReflectable` and `RPCEV_*` system
+   used by the original multiplayer (`ShowGhost`, `HideGhost`,
+   `MobfaceData`, door RPCs, authority transfer). The descriptors are
+   initialized even in single-player, but no transport is created; starting
+   it needs the FESL/peer object that only the multiplayer frontend builds.
+   That is the path to replace the hand-written sync with engine ghosts.
 

@@ -33,7 +33,7 @@ loaded, positions read from inside the game):
 | host/join | F9 host, F10 join loopback, role persisted in the config |
 | round trip | 15-31 ms |
 | frame rate | playable; ~40-60 fps in the focused window with traffic and doors on, actors off (earlier measured runs, no plugin-induced stutter) |
-| crashes | none caused by the plugin since the instrumentation was added; a v136 5-minute two-client soak stayed clean (26k/29k applies, `setfail=0`, `snaps=0`, both alive) |
+| crashes | none caused by the plugin since the instrumentation was added; v136 ran a 6-minute idle soak and a 4-minute movement soak (319 scancode moves) clean: 70k/72k applies, `setfail=0`, `posfail=0`, `snaps=0/1`, both clients alive |
 
 Research log with every address, measurement, crash cause and dead end:
 [NOTES.md](NOTES.md). The plugin source is not public yet.
@@ -176,6 +176,11 @@ Nothing to play: there is no co-op release. The internal test procedure is:
 - **Ambient NPCs are not synchronised.** Pinning the positions of world NPCs
   crashed through a corrupted pointer and made the NPC scheduler spawn
   replacements, so the layer is off by default (`actors 0` in the config).
+- **Campaign missions and objectives are local to each client.** Both copies
+  load the same save, but mission scripts, objectives, money and progress run
+  independently; completing an objective on one client does not advance the
+  other. A shared story campaign needs host-authoritative mission state, which
+  the campaign scripts do not expose.
 - **The NPC's own AI fights the animation state.** It puts the body back into
   its own state every frame, so the peer's state has to be forced back
   repeatedly; the result is right most of the time but not frame perfect.

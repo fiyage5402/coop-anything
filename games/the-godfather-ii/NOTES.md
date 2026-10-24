@@ -3107,3 +3107,29 @@ puppets then read `unq_tommy_cipolla` with position/state sync still clean
 (`conv` 15-31 ms, `setfail=0`, `snaps=0`). Config key `model 1`. The earlier
 player-clone avatar (a real second `Player`) still crashes when the local
 player walks (A `0x0049F474`, B `0x0046DD7D`), so `avatar 0`.
+
+## 2026-10-24, fifty-third session: model trigger verified, config parser fix
+
+The `model 1` line was being eaten by the `mode` branch (`strncmp(p,"mode",4)`
+matches `model` too), so it set the client role and never enabled the model
+forcing; the auto-target kept whatever body it found. v136 requires a space
+after `mode` (`mode host` / `mode client`) and lets `model 1` parse. B's log
+then showed the automatic conversion:
+
+```
+model: 0x063C5B80 -> unq_tommy_cipolla (rebuild queued, try 1)
+swap: obj=0x063C5B80 mode=2 name='' slot=0x0 -> 1
+```
+
+and the target read `unq_tommy_cipolla`/`unq_tommy_cipolla`/`tommy01`/
+`player`. Position and state sync stayed clean afterwards (`conv` 15-16 ms,
+`setfail=0`, `posfail=0`, `snaps=0`, both clients alive). The `net` line now
+reports the real role again: A `mode host`, B `mode client`.
+
+v136 also adds `hidecar 1`: while the peer is in a vehicle the borrowed body
+is dropped 6 m under the world (`hidden=` in `netdiag`) so the proxy car is
+what the player sees instead of a body standing on the roof. The command
+`hidecar 0|1` toggles it. The RPC probe command `netprobe` is disabled: on a
+fresh client the RPC array allocators crashed at `0xD18B150A`; the low-level
+`callesi`/`writed` commands stay for manual work, and the private address map
+is in `local/RPC-FINDINGS.md`.

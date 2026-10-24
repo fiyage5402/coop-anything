@@ -3067,3 +3067,43 @@ Client→host car position **and** yaw are confirmed.
 
 `player+0x1E40` is the correct current-car pointer; the v131 nearest-car
 heuristic was wrong (on foot it picked parked cars).  Stable build v132.
+
+## 2026-10-24, fifty-second session: the engine's own RPC/ghost layer found
+
+While checking whether Dead Space 3's co-op could inform this mod, the same
+EARS RPC/NetReflectable/GhostConnection layer turned out to be compiled into
+Godfather II. The exe contains `RPCEV_Player_RPC_ShowGhost`, `HideGhost`,
+`MobfaceData`, `RPCEV_Door_RPC_OpenDoor`/`Request_OpenDoor`,
+`RPCEV_NetReflectable_RPC_AuthorityTransfer*`,
+`RPC_GhostConnection_rpcStartGhosting`/`rpcEndGhosting`, and a `NetConnection`
+class. The RPC descriptors are global objects linked at startup into a list
+headed at `0x12059CE`; `NetConnection` has vtable `0xE35EA8` and constructor
+`0x4BFB80`. This is the layer the original multiplayer used, not a
+reimplementation.
+
+The practical question is whether a campaign can create a `NetConnection`
+without FESL. The descriptors exist in single-player, but no connection is
+created. Two paths: (a) drive the RPC layer with a local UDP transport shim,
+or (b) keep the manual puppet and use individual RPCs only where useful
+(`MobfaceData` appearance, door open). The private address map is in
+`local/RPC-FINDINGS.md` (not published).
+
+Dead Space 3 (2013, same engine family) ships BlazeSDK `3.19.07.0` and shows
+the newer shape of the same design: `PlayerGhost*` state tables for the remote
+player, `EntityMovementProxy_RPC_Enable` for moving entities,
+`GameStateReflector_RPC_StreamSetLoaded` for streaming, and
+`ClientRequestAccess`/`HostGrantClientAccess` arbitration for interactive
+objects. It confirms the architecture but its code does not transplant into
+GF2.
+
+**Also this session:** v134 gives the borrowed puppet a player-like
+appearance automatically. The shipped unique model `unq_tommy_cipolla` is a
+headful, player-style body (unlike the saved `mobface` preset, which is
+headless on an NPC). When a new puppet is attached and its part-string
+buffers are large enough, the mod rewrites preset/theme/swapset/assembly to
+`unq_tommy_cipolla`/`unq_tommy_cipolla`/`tommy01`/`player` and rebuilds once.
+A manual `setparts` on an associate produced a headful red-shirted body; both
+puppets then read `unq_tommy_cipolla` with position/state sync still clean
+(`conv` 15-31 ms, `setfail=0`, `snaps=0`). Config key `model 1`. The earlier
+player-clone avatar (a real second `Player`) still crashes when the local
+player walks (A `0x0049F474`, B `0x0046DD7D`), so `avatar 0`.

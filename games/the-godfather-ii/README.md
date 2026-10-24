@@ -6,7 +6,7 @@
 | Versions tested | `1.0.789.0` as shipped inside the SE v0.56 Nexus mod bundle - an **unverified third-party executable**, not a build to follow: run only in a disposable copy. Boots to the campaign there, menu and gameplay confirmed. Clean retail `1.0.764.0` inspected statically only |
 | Projects | Multiplayer Revival (match multiplayer, not campaign) <https://www.nexusmods.com/thegodfather2/mods/95>; The Godfather II SE script extender (modding hook, not co-op) <https://www.nexusmods.com/thegodfather2/mods/40>; VisceralToolkit (asset/stream tooling, WIP) <https://github.com/Greavesy1899/VisceralToolkit> |
 | QA level | automated for the sync layer (scripted two-client checks of position, animation state and stability; no campaign playthrough, no public release) |
-| Last updated | 2026-10-22 |
+| Last updated | 2026-10-24 |
 
 ## Where things stand
 
@@ -97,10 +97,16 @@ only:
   - **networking**: UDP loopback, 20 Hz position packets, one packet carrying
     position, heading, the animation state id, the two secondary action state
     ids, the "in a vehicle" flag, the peer's vehicle class and the peer's state
-    machine names;
+    machine names; host/join keys F9/F10 and a persisted role; clock, traffic,
+    door, and peer-car packets (`G2CT`/`G2CV`/`G2CD`/`G2CF`);
   - **puppet**: automatic pick of a live crew recruit near the player, with
     dead or streamed-out bodies replaced, position and heading driven every
     frame, animation state re-applied when the NPC's own AI overrides it;
+  - **appearance**: the borrowed body is rebuilt once to the shipped headful
+    `unq_tommy_cipolla` model (`model 1`), so it reads as a player instead of a
+    random pedestrian;
+  - **world layers**: day/night clock, nearby moving traffic, doors, and the
+    peer's own car (position + yaw; a visual proxy without collision);
   - **diagnostics**: a file-driven console (`coop_cmd.txt` -> `coopcore_cmd.txt`)
     with live counters for every apply path, plus crash and access-violation
     handlers;
@@ -149,17 +155,18 @@ Nothing to play: there is no co-op release. The internal test procedure is:
 
 ## Known issues
 
-- **The peer's car cannot be shown.** Vehicles are simulated per client: the
-  car the host sits in does not exist in the client's world at all (measured:
-  the client receives the vehicle class but no object of that class exists near
-  the peer). The packet carries the class and the client side is written, but
-  there is nothing to attach to; showing it needs a car to be created in the
-  client world.
-- **The puppet looks like a crew recruit, not like the protagonist.** Giving
-  an NPC the player's saved appearance crashed the game
-  (`BuildModelFromSavedData` on a live character jumps through a corrupted
-  pointer), and forcing the player model without the saved apparel data yields
-  a head without a body.
+- **The peer's car is a visual proxy.** Position and yaw are synced and were
+  measured matching exactly while the client drove the mansion limousine, but
+  the receiver's matched car has no collision and cannot be entered: its Havok
+  body stays at the original spawn. A real car needs an
+  ObjectManager/SimManager spawn with a valid stream GUID; the SimManager
+  packet hash entries are not compact attribute packets, so that path is still
+  open.
+- **The puppet cannot wear the peer's exact face.** It is rebuilt once to the
+  shipped `unq_tommy_cipolla` model (`model 1`), a headful player-style body,
+  so it reads as a player rather than a random pedestrian. Giving an NPC the
+  saved `mobface` appearance is headless, and `BuildModelFromSavedData` on a
+  live character crashes.
 - **Ambient NPCs are not synchronised.** Pinning the positions of world NPCs
   crashed through a corrupted pointer and made the NPC scheduler spawn
   replacements, so the layer is off by default (`actors 0` in the config).

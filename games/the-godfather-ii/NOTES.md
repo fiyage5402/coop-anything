@@ -3009,3 +3009,18 @@ worker at 0x43AB62.  Need the ObjectManager attribute packet/GUID, not the
 hash entry.
 
 **Stable state:** A 2192, B 6892, v120, host/join connected.
+
+## 2026-10-24, fiftieth session: host/join hotkeys
+
+Added `net_hotkey_tick()` to `frame_work()` (v130):
+
+- **F9** = host on port 47777
+- **F10** = join `127.0.0.1:47777`
+- **F11** = stop networking
+
+Edge-triggered, beeps, writes `coop_net.cfg`.  Verified F9 on A + F10 on B:
+`host conn=1` / `client conn=1` within a few seconds.  F11 was pressed but did
+not register in that test (game may consume F11); F9/F10 are confirmed.
+The console `net host/join/stop` commands still work.
+
+**Current:** A 6448, B 26324, both v130, host/join connected.

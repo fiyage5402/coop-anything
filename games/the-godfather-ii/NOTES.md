@@ -3036,3 +3036,30 @@ and must stay the only source.  Client-side car sending still needs a proper
 "player is in vehicle" flag, not a nearest-car heuristic.
 
 Stable v132: A 23164, B 23360, host/join connected.
+
+## 2026-10-24, verified car-door spot and scancode input
+
+User verified the right client can enter the mansion limo when standing at the
+driver door **facing it**:
+
+* spot: **171.508 10.221 -215.837**
+* player forward: **(-0.9867, 0, -0.1626)**
+* screen prompt: **E Вход**
+
+Important test-tooling discovery: `pyautogui.press`/`keyDown` is ignored by the
+game's raw-input path (W/E did nothing).  `keybd_event` with
+`KEYEVENTF_SCANCODE` is accepted.  Added `local/rawkey.py`:
+
+```
+py rawkey.py tap <pid> 12          # E
+py rawkey.py hold <pid> 11 2.0     # W for 2 s
+```
+
+With it B entered the limo (`player+0x1E40 = 0x062221E8`), drove from
+`171.5,-215.8` to `129.1,-221.2`, then `109.5,-223.3`.  A's matched car
+`0x05EE28E8` reported exactly `109.54,10.07,-223.30` with forward
+`(-1.0,0,-0.09)` against B's own `109.52,10.07,-223.31` / `(-0.99,0.05,-0.09)`.
+Client→host car position **and** yaw are confirmed.
+
+`player+0x1E40` is the correct current-car pointer; the v131 nearest-car
+heuristic was wrong (on foot it picked parked cars).  Stable build v132.

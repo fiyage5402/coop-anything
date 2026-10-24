@@ -3032,10 +3032,14 @@ Tried `player_vehicle_ptr()` with offsets `0x1E40/0x24FC/0x2528/0x3064`
 **nearby** car pointers at `+0x24FC/+0x2528`, so the helper picked one and sent
 G2CF while walking; the host moved that parked car (`A pcar=0xD626C4,
 pcapplied=2419`).  Reverted in v132: `+0x1E40` is the owned/current car pointer
-and must stay the only source.  Client-side car sending still needs a proper
-"player is in vehicle" flag, not a nearest-car heuristic.
+and must stay the only source.  Later tested by actually seating the client:
+once B sits in the limo, `+0x1E40` becomes valid and G2CF is sent; no extra
+"in vehicle" flag is needed.  A nearest-car heuristic is still wrong because
+on foot it picks parked cars.
 
-Stable v132: A 23164, B 23360, host/join connected.
+Stable v132: A 23164, B 23360, host/join connected; later B entered the limo
+and drove to 109.5,-223.3, A's proxy matched it.  F9/F10 confirmed, F11 still
+unreliable (game may consume it).
 
 ## 2026-10-24, verified car-door spot and scancode input
 

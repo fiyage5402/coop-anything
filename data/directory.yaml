@@ -2299,13 +2299,13 @@
   open_source: unknown
   last_activity: unknown
   qa: none
-  notes: No public PC story-campaign co-op project surfaced; the restored match multiplayer and the SE script extender are not campaign co-op. Own research on branch game/the-godfather-ii (claim issue #78) has a working two-client prototype in disposable copies of an unverified third-party executable: an own-code ASI plugin syncs position, heading, animation state and the vehicle flag over UDP, with the peer's position matching exactly (0.00 m) and the animation state transferred by its name hash. Not published, no campaign playthrough.
+  notes: No public PC story-campaign co-op project surfaced; the restored match multiplayer and the SE script extender are not campaign co-op. Own research on branch game/the-godfather-ii (claim issue #78) has a working two-client prototype in disposable copies of an unverified third-party executable: an own-code ASI plugin syncs position/heading (snapshot interpolation, 0.00 m measured), animation state and state-machine names, day/night time, nearby traffic, doors, and the peer's car position/yaw (visual proxy, no collision), and rebuilds the borrowed body to the headful unq_tommy_cipolla model. Host/join uses F9/F10 over UDP loopback. A 6-minute idle and a 4-minute movement soak (319 scancodes) stayed clean. Campaign missions/objectives remain local to each client; ambient NPC sync and the exact peer face are open. The engine's own EARS RPC/GhostConnection layer is present in the exe but needs the FESL/peer transport. Not published, no campaign playthrough.
   sources:
   - https://www.pcgamingwiki.com/wiki/The_Godfather_II
   - https://www.nexusmods.com/thegodfather2/mods/95
   - https://www.nexusmods.com/thegodfather2/mods/40
   - https://www.ign.com/articles/2009/03/18/the-godfather-ii-gets-multiplayer-mode
-  checked: '2026-10-22'
+  checked: '2026-10-24'
   searched:
   - 'Repo DIRECTORY.md and games; public GitHub issue/PR and repository search for Godfather 2 / Godfather II co-op and multiplayer, 2026-10-20'
   - 'English web searches: Godfather II co-op campaign, co-op mod, online co-op, multiplayer mod; checked Nexus, ModDB, GameBanana, GameFAQs results and PCGamingWiki, 2026-10-20'

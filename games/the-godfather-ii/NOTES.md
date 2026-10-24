@@ -3024,3 +3024,15 @@ not register in that test (game may consume F11); F9/F10 are confirmed.
 The console `net host/join/stop` commands still work.
 
 **Current:** A 6448, B 26324, both v130, host/join connected.
+
+## 2026-10-24, fifty-first session: car ownership pointer regression
+
+Tried `player_vehicle_ptr()` with offsets `0x1E40/0x24FC/0x2528/0x3064`
+(v131) to fix the client's car not being sent.  On foot the client also has
+**nearby** car pointers at `+0x24FC/+0x2528`, so the helper picked one and sent
+G2CF while walking; the host moved that parked car (`A pcar=0xD626C4,
+pcapplied=2419`).  Reverted in v132: `+0x1E40` is the owned/current car pointer
+and must stay the only source.  Client-side car sending still needs a proper
+"player is in vehicle" flag, not a nearest-car heuristic.
+
+Stable v132: A 23164, B 23360, host/join connected.
